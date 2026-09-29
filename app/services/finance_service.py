@@ -1,7 +1,19 @@
 import os
 # Fix Vercel read-only filesystem issue for yfinance
 os.environ["YFINANCE_CACHE_DIR"] = "/tmp/yf_cache"
+
+import requests
 import yfinance as yf
+
+# Global session to bypass Vercel IP blocks
+yf_session = requests.Session()
+yf_session.headers.update({
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
+    'Accept': '*/*',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Connection': 'keep-alive'
+})
+
 try:
     yf.set_tz_cache_location("/tmp/yf_tz")
 except Exception:
@@ -44,7 +56,7 @@ def _fetch_yahoo_quote(symbol):
         raise ValueError("Market data currently unavailable (Yahoo rate limited).")
         
     try:
-        ticker = yf.Ticker(symbol)
+        ticker = yf.Ticker(symbol, session=yf_session)
         
         try:
             info = ticker.info
@@ -68,7 +80,7 @@ def _fetch_yahoo_quote(symbol):
         inr_price = None
         if currency and currency.upper() != 'INR':
             try:
-                forex_ticker = yf.Ticker(f"{currency.upper()}INR=X")
+                forex_ticker = yf.Ticker(f"{currency.upper()}INR=X", session=yf_session)
                 fx_rate = getattr(forex_ticker, 'fast_info', {}).get('lastPrice')
                 if not fx_rate:
                     fx_hist = forex_ticker.history(period="1d")
@@ -380,7 +392,7 @@ def get_stock_history(symbol, period='1mo'):
         interval = '1wk'
         
     try:
-        ticker = yf.Ticker(symbol)
+        ticker = yf.Ticker(symbol, session=yf_session)
         hist = ticker.history(period=period, interval=interval)
         
         # If empty and symbol has no suffix, try searching for the correct suffix
@@ -388,7 +400,7 @@ def get_stock_history(symbol, period='1mo'):
             search_res = search_stocks(symbol)
             if search_res and search_res[0].get('symbol') != symbol:
                 best_match = search_res[0].get('symbol')
-                ticker = yf.Ticker(best_match)
+                ticker = yf.Ticker(best_match, session=yf_session)
                 hist = ticker.history(period=period, interval=interval)
 
         # Ensure we don't send NaN values which break JSON and Lightweight Charts
@@ -399,13 +411,23 @@ def get_stock_history(symbol, period='1mo'):
         
         
         if hist.empty:
+            errors = []
+            
+            try:
+                return _fetch_yahoo_history_raw(symbol, period, interval)
+            except Exception as e:
+                errors.append(f"Yahoo Raw: {str(e)}")
+                
             api_key = current_app.config.get('TWELVE_DATA_API_KEY')
             if api_key and api_key != 'your-twelvedata-api-key-here':
                 try:
                     return _fetch_twelvedata_history(symbol, period, interval, api_key)
                 except Exception as e:
-                    current_app.logger.warning(f"TwelveData history fallback failed: {e}")
-            raise ValueError("No historical data found.")
+                    errors.append(f"TwelveData: {str(e)}")
+            else:
+                errors.append("TwelveData API Key missing or invalid")
+                
+            raise ValueError(f"No historical data found. Details: {' | '.join(errors)}")
 
             
         labels = [date.strftime('%Y-%m-%d') for date in hist.index]
