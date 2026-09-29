@@ -67,7 +67,10 @@ def _fetch_yahoo_quote(symbol):
         
         hist = ticker.history(period="5d")
         if hist.empty:
-            raise ValueError("No price data available for this symbol.")
+            try:
+                return _fetch_yahoo_quote_raw(symbol)
+            except Exception as raw_e:
+                raise ValueError(f"No price data available for this symbol. Raw fallback failed: {raw_e}")
             
         current_price = hist['Close'].iloc[-1]
         previous_close = hist['Close'].iloc[-2] if len(hist) > 1 else current_price
@@ -228,7 +231,11 @@ def get_stock_quote(symbol):
         try:
             result = _fetch_yahoo_quote(symbol)
         except Exception:
-            result = None
+            try:
+                result = _fetch_yahoo_quote_raw(symbol)
+            except Exception as e:
+                current_app.logger.error(f"Yahoo Raw quote failed: {e}")
+                result = None
 
     if not result and '.' not in normalized_symbol:
         # If both providers failed and it's a generic symbol, it might be an Indian/international stock missing its suffix.
@@ -243,7 +250,13 @@ def get_stock_quote(symbol):
                 except Exception:
                     pass
             if not result:
-                result = _fetch_yahoo_quote(best_match)
+                try:
+                    result = _fetch_yahoo_quote(best_match)
+                except Exception:
+                    try:
+                        result = _fetch_yahoo_quote_raw(best_match)
+                    except Exception:
+                        result = None
                 
     if not result:
         raise ValueError("Market data currently unavailable. Could not fetch current live data.")
