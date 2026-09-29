@@ -560,3 +560,119 @@ def search_stocks(query):
         return []
 
 
+
+
+
+def _fetch_yahoo_history_raw(symbol, period, interval):
+    import requests
+    from datetime import datetime
+    url = f"https://query2.finance.yahoo.com/v8/finance/chart/{symbol}?range={period}&interval={interval}"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    }
+    response = requests.get(url, headers=headers, timeout=5)
+    response.raise_for_status()
+    result = response.json().get('chart', {}).get('result', [])
+    if not result:
+        raise ValueError("No historical data found from raw Yahoo API.")
+        
+    res = result[0]
+    timestamps = res.get('timestamp', [])
+    if not timestamps:
+        raise ValueError("No historical data found from raw Yahoo API.")
+        
+    quote = res.get('indicators', {}).get('quote', [{}])[0]
+    opens = quote.get('open', [])
+    highs = quote.get('high', [])
+    lows = quote.get('low', [])
+    closes = quote.get('close', [])
+    volumes = quote.get('volume', [])
+    
+    labels, final_timestamps, f_opens, f_highs, f_lows, f_closes, f_volumes = [], [], [], [], [], [], []
+    
+    for i in range(len(timestamps)):
+        if closes[i] is None: continue
+        ts = timestamps[i]
+        dt = datetime.fromtimestamp(ts)
+        labels.append(dt.strftime('%Y-%m-%d'))
+        final_timestamps.append(ts)
+        f_opens.append(round(opens[i], 2))
+        f_highs.append(round(highs[i], 2))
+        f_lows.append(round(lows[i], 2))
+        f_closes.append(round(closes[i], 2))
+        f_volumes.append(int(volumes[i]))
+        
+    return {
+        'labels': labels, 'prices': f_closes, 'timestamps': final_timestamps,
+        'open': f_opens, 'high': f_highs, 'low': f_lows, 'close': f_closes, 'volume': f_volumes
+    }
+
+def _fetch_yahoo_quote_raw(symbol):
+    import requests
+    url = f"https://query2.finance.yahoo.com/v8/finance/chart/{symbol}?range=1d&interval=1d"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    }
+    response = requests.get(url, headers=headers, timeout=5)
+    response.raise_for_status()
+    data = response.json()
+    res = data.get('chart', {}).get('result', [])
+    if not res:
+        raise ValueError("No live data found from raw Yahoo API.")
+        
+    meta = res[0].get('meta', {})
+    current_price = meta.get('regularMarketPrice')
+    previous_close = meta.get('chartPreviousClose') or current_price
+    if not current_price:
+        raise ValueError("No live price found from raw Yahoo API.")
+        
+    change = current_price - previous_close
+    change_percent = (change / previous_close) * 100 if previous_close else 0
+    
+    currency = meta.get('currency', 'USD')
+    
+    inr_price = None
+    if currency and currency.upper() != 'INR':
+        try:
+            fx_url = f"https://query2.finance.yahoo.com/v8/finance/chart/{currency.upper()}INR=X?range=1d&interval=1d"
+            fx_res = requests.get(fx_url, headers=headers, timeout=3).json()
+            fx_rate = fx_res.get('chart', {}).get('result', [])[0].get('meta', {}).get('regularMarketPrice')
+            if fx_rate:
+                inr_price = round(float(current_price * fx_rate), 2)
+        except:
+            pass
+            
+    exchange = meta.get('fullExchangeName') or meta.get('exchangeName', 'Unknown Exchange')
+    if exchange in ['BSE', 'BSI']:
+        exchange = 'BSE (Bombay Stock Exchange)'
+    elif exchange in ['NSE', 'NSI']:
+        exchange = 'NSE (National Stock Exchange)'
+        
+    quote_data = res[0].get('indicators', {}).get('quote', [{}])[0]
+    opens, highs, lows = quote_data.get('open', []), quote_data.get('high', []), quote_data.get('low', [])
+    day_open = opens[0] if opens and opens[0] is not None else None
+    day_high = max([h for h in highs if h is not None]) if highs and any(h is not None for h in highs) else None
+    day_low = min([l for l in lows if l is not None]) if lows and any(l is not None for l in lows) else None
+
+    return {
+        'symbol': symbol,
+        'name': meta.get('longName') or meta.get('shortName') or symbol,
+        'price': round(float(current_price), 2),
+        'currency': currency,
+        'inr_price': inr_price,
+        'exchange': exchange,
+        'change': round(float(change), 2),
+        'change_percent': round(float(change_percent), 2),
+        'previous_close': round(float(previous_close), 2),
+        'open': round(float(day_open), 2) if day_open else None,
+        'day_high': round(float(day_high), 2) if day_high else None,
+        'day_low': round(float(day_low), 2) if day_low else None,
+        'year_high': meta.get('fiftyTwoWeekHigh'),
+        'year_low': meta.get('fiftyTwoWeekLow'),
+        'volume': meta.get('regularMarketVolume'),
+        'market_cap': None,
+        'pe_ratio': None,
+        'dividend_yield': None,
+        'provider': 'Yahoo Finance'
+    }
+
