@@ -1,4 +1,7 @@
 import os
+# Fix Vercel read-only filesystem issue for yfinance globally
+os.environ["YFINANCE_CACHE_DIR"] = "/tmp/yf_cache"
+
 from dotenv import load_dotenv
 
 basedir = os.path.abspath(os.path.dirname(__file__))

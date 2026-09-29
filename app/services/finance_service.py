@@ -1,4 +1,12 @@
+import os
+# Fix Vercel read-only filesystem issue for yfinance
+os.environ["YFINANCE_CACHE_DIR"] = "/tmp/yf_cache"
 import yfinance as yf
+try:
+    yf.set_tz_cache_location("/tmp/yf_tz")
+except Exception:
+    pass
+
 import requests
 from flask import current_app
 import time
