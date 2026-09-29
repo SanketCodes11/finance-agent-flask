@@ -294,6 +294,74 @@ def get_multiple_stock_quotes(symbols):
                 
     return results
 
+
+def _fetch_twelvedata_history(symbol, period, interval_yd, api_key):
+    from datetime import datetime
+    interval_map = {'5m': '5min', '15m': '15min', '1d': '1day', '1wk': '1week'}
+    td_interval = interval_map.get(interval_yd, '1day')
+    
+    size_map = {'1d': 78, '5d': 130, '1w': 130, '1mo': 22, '3mo': 65, '6mo': 130, '1y': 252, '5y': 260, 'max': 500}
+    outputsize = size_map.get(period, 30)
+
+    td_sym = symbol
+    exchange_param = ""
+    if symbol.endswith('.NS'):
+        td_sym = symbol[:-3]
+        exchange_param = "&exchange=NSE"
+    elif symbol.endswith('.BO'):
+        td_sym = symbol[:-3]
+        exchange_param = "&exchange=BSE"
+
+    url = f"https://api.twelvedata.com/time_series?symbol={td_sym}{exchange_param}&interval={td_interval}&outputsize={outputsize}&apikey={api_key}"
+    
+    import requests
+    response = requests.get(url, timeout=5)
+    response.raise_for_status()
+    data = response.json()
+    
+    if data.get('status') == 'error':
+        err = data.get('message', '')
+        if 'You have reached' in err or 'Rate limit' in err:
+            raise Exception("429_TWELVEDATA")
+        raise ValueError(f"TwelveData Error: {err}")
+        
+    values = data.get('values', [])
+    if not values:
+        raise ValueError("No historical data found from TwelveData.")
+        
+    values.reverse() # Newest first -> Oldest first for charts
+    
+    labels, timestamps, opens, highs, lows, closes, volumes = [], [], [], [], [], [], []
+    
+    for v in values:
+        dt_str = v.get('datetime')
+        try:
+            if len(dt_str) > 10:
+                dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
+            else:
+                dt = datetime.strptime(dt_str, "%Y-%m-%d")
+        except:
+            continue
+            
+        labels.append(dt.strftime('%Y-%m-%d'))
+        timestamps.append(int(dt.timestamp()))
+        opens.append(round(float(v.get('open', 0)), 2))
+        highs.append(round(float(v.get('high', 0)), 2))
+        lows.append(round(float(v.get('low', 0)), 2))
+        closes.append(round(float(v.get('close', 0)), 2))
+        volumes.append(int(v.get('volume', 0)))
+        
+    return {
+        'labels': labels,
+        'prices': closes,
+        'timestamps': timestamps,
+        'open': opens,
+        'high': highs,
+        'low': lows,
+        'close': closes,
+        'volume': volumes
+    }
+
 def get_stock_history(symbol, period='1mo'):
     if not _check_yahoo_circuit():
         raise ValueError("Market history currently unavailable (Yahoo rate limited).")
@@ -329,8 +397,16 @@ def get_stock_history(symbol, period='1mo'):
         hist = hist[~hist.index.duplicated(keep='first')]
         hist = hist.sort_index()
         
+        
         if hist.empty:
+            api_key = current_app.config.get('TWELVE_DATA_API_KEY')
+            if api_key and api_key != 'your-twelvedata-api-key-here':
+                try:
+                    return _fetch_twelvedata_history(symbol, period, interval, api_key)
+                except Exception as e:
+                    current_app.logger.warning(f"TwelveData history fallback failed: {e}")
             raise ValueError("No historical data found.")
+
             
         labels = [date.strftime('%Y-%m-%d') for date in hist.index]
         timestamps = [int(date.timestamp()) for date in hist.index]
