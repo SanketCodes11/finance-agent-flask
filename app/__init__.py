@@ -90,13 +90,27 @@ def create_app(config_class=Config):
         return render_template('errors/429.html'), 429
 
     if not app.debug and not app.testing:
-        if not os.path.exists('logs'):
-            os.mkdir('logs')
-        file_handler = RotatingFileHandler('logs/finance.log', maxBytes=10240, backupCount=10)
-        file_handler.setFormatter(logging.Formatter(
-            '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'))
-        file_handler.setLevel(logging.INFO)
-        app.logger.addHandler(file_handler)
+        # Vercel serverless compatibility: /tmp is the only writable directory
+        is_vercel = os.environ.get('VERCEL') == '1'
+        log_dir = '/tmp/logs' if is_vercel else 'logs'
+        
+        if not os.path.exists(log_dir):
+            try:
+                os.mkdir(log_dir)
+            except OSError:
+                pass # Fallback gracefully if even /tmp/logs fails
+
+        log_file = os.path.join(log_dir, 'finance.log')
+        try:
+            file_handler = RotatingFileHandler(log_file, maxBytes=10240, backupCount=10)
+            file_handler.setFormatter(logging.Formatter(
+                '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'))
+            file_handler.setLevel(logging.INFO)
+            app.logger.addHandler(file_handler)
+        except OSError:
+            # Fallback to console logging only if file logging is impossible
+            pass
+            
         app.logger.setLevel(logging.INFO)
         app.logger.info('Finance Insight Agent startup')
 
