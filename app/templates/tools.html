@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid px-0">
+    <h2 class="fw-bold tracking-tight mb-4">Financial Calculators</h2>
+    <div class="row g-4">
+        <!-- SIP Calculator -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card border-0 shadow-sm rounded-4 premium-card h-100">
+                <div class="card-body p-4">
+                    <h5 class="fw-bold mb-4"><i class="fa-solid fa-calculator text-primary me-2"></i> SIP Calculator</h5>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small">Monthly Investment</label>
+                        <input type="number" id="sipAmount" class="form-control bg-body-tertiary border-0 rounded-pill px-3" value="5000">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small">Expected Return Rate (p.a %)</label>
+                        <input type="number" id="sipRate" class="form-control bg-body-tertiary border-0 rounded-pill px-3" value="12">
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label text-muted small">Time Period (Years)</label>
+                        <input type="number" id="sipYears" class="form-control bg-body-tertiary border-0 rounded-pill px-3" value="10">
+                    </div>
+                    <button class="btn btn-primary rounded-pill w-100 fw-medium shadow-sm mb-4" onclick="calculateSIP()">Calculate</button>
+                    
+                    <div class="p-3 bg-primary-subtle text-primary-emphasis rounded-4 text-center">
+                        <p class="mb-1 small">Estimated Returns</p>
+                        <h3 class="fw-bold mb-0" id="sipResult">0.00</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- CAGR Calculator -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card border-0 shadow-sm rounded-4 premium-card h-100">
+                <div class="card-body p-4">
+                    <h5 class="fw-bold mb-4"><i class="fa-solid fa-arrow-trend-up text-success me-2"></i> CAGR Calculator</h5>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small">Initial Value</label>
+                        <input type="number" id="cagrInitial" class="form-control bg-body-tertiary border-0 rounded-pill px-3" value="10000">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small">Final Value</label>
+                        <input type="number" id="cagrFinal" class="form-control bg-body-tertiary border-0 rounded-pill px-3" value="20000">
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label text-muted small">Duration (Years)</label>
+                        <input type="number" id="cagrYears" class="form-control bg-body-tertiary border-0 rounded-pill px-3" value="5">
+                    </div>
+                    <button class="btn btn-success rounded-pill w-100 fw-medium shadow-sm mb-4" onclick="calculateCAGR()">Calculate</button>
+                    
+                    <div class="p-3 bg-success-subtle text-success-emphasis rounded-4 text-center">
+                        <p class="mb-1 small">CAGR</p>
+                        <h3 class="fw-bold mb-0" id="cagrResult">0.00%</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trade P/L Calculator -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card border-0 shadow-sm rounded-4 premium-card h-100">
+                <div class="card-body p-4">
+                    <h5 class="fw-bold mb-4"><i class="fa-solid fa-scale-balanced text-info me-2"></i> Trade P/L Calculator</h5>
+                    
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label text-muted small">Buy Price</label>
+                            <input type="number" id="tradeBuy" class="form-control bg-body-tertiary border-0 rounded-pill px-3" placeholder="0.00" min="0">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label text-muted small">Sell Price</label>
+                            <input type="number" id="tradeSell" class="form-control bg-body-tertiary border-0 rounded-pill px-3" placeholder="0.00" min="0">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label text-muted small">Quantity</label>
+                        <input type="number" id="tradeQty" class="form-control bg-body-tertiary border-0 rounded-pill px-3" placeholder="1" min="1">
+                    </div>
+                    
+                    <div class="row g-2 mb-4">
+                        <div class="col-6">
+                            <label class="form-label text-muted small">Buy Charges</label>
+                            <input type="number" id="tradeBuyCharges" class="form-control bg-body-tertiary border-0 rounded-pill px-3" value="0" min="0">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label text-muted small">Sell Charges</label>
+                            <input type="number" id="tradeSellCharges" class="form-control bg-body-tertiary border-0 rounded-pill px-3" value="0" min="0">
+                        </div>
+                    </div>
+                    
+                    <button class="btn btn-info text-white rounded-pill w-100 fw-medium shadow-sm mb-4" onclick="calculateTradePL()">Calculate</button>
+                    
+                    <div id="tradeResultBox" class="p-3 bg-secondary-subtle text-secondary-emphasis rounded-4 text-center">
+                        <p class="mb-1 small">Net P/L</p>
+                        <h3 class="fw-bold mb-2" id="tradeNetPL">0.00</h3>
+                        <div class="d-flex justify-content-between small text-muted px-2">
+                            <span>Ret: <span id="tradeReturn" class="fw-bold">0.00%</span></span>
+                            <span>Charges: <span id="tradeTotalCharges" class="fw-bold">0.00</span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function calculateSIP() {
+    const P = parseFloat(document.getElementById('sipAmount').value);
+    const i = parseFloat(document.getElementById('sipRate').value) / 100 / 12;
+    const n = parseFloat(document.getElementById('sipYears').value) * 12;
+    
+    if(P && i && n) {
+        const M = P * ((Math.pow(1 + i, n) - 1) / i) * (1 + i);
+        document.getElementById('sipResult').textContent = M.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits:2});
+    }
+}
+function calculateCAGR() {
+    const start = parseFloat(document.getElementById('cagrInitial').value);
+    const end = parseFloat(document.getElementById('cagrFinal').value);
+    const years = parseFloat(document.getElementById('cagrYears').value);
+    
+    if(start && end && years) {
+        const cagr = (Math.pow(end/start, 1/years) - 1) * 100;
+        document.getElementById('cagrResult').textContent = cagr.toFixed(2) + '%';
+    }
+}
+
+function calculateTradePL() {
+    const buyPrice = Math.max(0, parseFloat(document.getElementById('tradeBuy').value) || 0);
+    const sellPrice = Math.max(0, parseFloat(document.getElementById('tradeSell').value) || 0);
+    const qty = Math.max(1, parseFloat(document.getElementById('tradeQty').value) || 0);
+    const buyCharges = Math.max(0, parseFloat(document.getElementById('tradeBuyCharges').value) || 0);
+    const sellCharges = Math.max(0, parseFloat(document.getElementById('tradeSellCharges').value) || 0);
+    
+    if (buyPrice > 0 && qty > 0) {
+        const buyValue = buyPrice * qty;
+        const sellValue = sellPrice * qty;
+        const totalCharges = buyCharges + sellCharges;
+        
+        const netPL = sellValue - buyValue - totalCharges;
+        const totalInvestment = buyValue + buyCharges;
+        const returnPct = totalInvestment > 0 ? (netPL / totalInvestment) * 100 : 0;
+        
+        const resultBox = document.getElementById('tradeResultBox');
+        const netPlElem = document.getElementById('tradeNetPL');
+        const returnElem = document.getElementById('tradeReturn');
+        
+        netPlElem.textContent = netPL.toFixed(2);
+        returnElem.textContent = returnPct.toFixed(2) + '%';
+        document.getElementById('tradeTotalCharges').textContent = totalCharges.toFixed(2);
+        
+        if (netPL > 0) {
+            resultBox.className = 'p-3 bg-success-subtle text-success-emphasis rounded-4 text-center';
+            netPlElem.className = 'fw-bold mb-2 text-success';
+            returnElem.className = 'fw-bold text-success';
+        } else if (netPL < 0) {
+            resultBox.className = 'p-3 bg-danger-subtle text-danger-emphasis rounded-4 text-center';
+            netPlElem.className = 'fw-bold mb-2 text-danger';
+            returnElem.className = 'fw-bold text-danger';
+        } else {
+            resultBox.className = 'p-3 bg-secondary-subtle text-secondary-emphasis rounded-4 text-center';
+            netPlElem.className = 'fw-bold mb-2';
+            returnElem.className = 'fw-bold';
+        }
+    }
+}
+</script>
+{% endblock %}

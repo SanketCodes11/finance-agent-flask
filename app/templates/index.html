@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Hero Section -->
+<div class="row align-items-center py-5">
+    <div class="col-lg-6 mb-5 mb-lg-0">
+        <h1 class="display-4 fw-bold text-body tracking-tight mb-3">{{ homepage_title|safe }}</h1>
+        <p class="lead text-muted mb-4 max-w-700">{{ homepage_subtitle|safe }}</p>
+        <div class="d-flex gap-3">
+            <a href="{{ url_for('auth.register') }}" class="btn btn-primary rounded-pill btn-lg px-4 fw-semibold shadow-sm">Get Started</a>
+            <a href="#features" class="btn btn-light rounded-pill btn-lg px-4 border fw-medium shadow-sm">Learn More</a>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="bg-body border rounded-4 p-2 shadow-lg position-relative overflow-hidden premium-card">
+            <div class="position-absolute top-0 start-0 w-100 h-100 bg-primary opacity-10"></div>
+            <img src="https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?q=80&w=800&auto=format&fit=crop" class="img-fluid rounded-4 border" alt="Dashboard Preview" style="filter: brightness(0.9);">
+        </div>
+    </div>
+</div>
+
+<!-- Features Section -->
+<div id="features" class="py-5 mt-4">
+    <div class="text-center mb-5">
+        <h2 class="text-body fw-bold tracking-tight">Platform Features</h2>
+        <p class="text-muted">Everything you need to track and analyze the market.</p>
+    </div>
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card h-100 bg-body border-0 shadow-sm premium-card rounded-4 feature-card">
+                <div class="card-body text-center p-5">
+                    <div class="feature-icon bg-primary-subtle text-primary rounded-circle d-inline-flex p-4 mb-4 shadow-sm">
+                        <i class="fa-solid fa-chart-pie fa-2x"></i>
+                    </div>
+                    <h4 class="text-body fw-bold">Real-Time Data</h4>
+                    <p class="text-muted mb-0 small lh-lg">Access up-to-the-minute stock quotes, historical price charts, and key financial metrics effortlessly.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 bg-body border-0 shadow-sm premium-card rounded-4 feature-card">
+                <div class="card-body text-center p-5">
+                    <div class="feature-icon bg-info-subtle text-info rounded-circle d-inline-flex p-4 mb-4 shadow-sm">
+                        <i class="fa-solid fa-robot fa-2x"></i>
+                    </div>
+                    <h4 class="text-body fw-bold">AI Insights</h4>
+                    <p class="text-muted mb-0 small lh-lg">Ask natural language questions about market movements and get concise, intelligent summaries.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 bg-body border-0 shadow-sm premium-card rounded-4 feature-card">
+                <div class="card-body text-center p-5">
+                    <div class="feature-icon bg-success-subtle text-success rounded-circle d-inline-flex p-4 mb-4 shadow-sm">
+                        <i class="fa-regular fa-newspaper fa-2x"></i>
+                    </div>
+                    <h4 class="text-body fw-bold">Curated News</h4>
+                    <p class="text-muted mb-0 small lh-lg">Stay updated with the latest financial news relevant to your portfolio and watchlists automatically.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Security Section -->
+<div class="py-5 text-center bg-body-tertiary rounded-4 my-5 px-3">
+    <div class="container">
+        <h2 class="text-body fw-bold mb-3 tracking-tight">Enterprise-Grade Security</h2>
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <p class="text-muted mb-5">Your privacy and data security are our top priorities. We use industry-standard encryption and security practices to protect your information.</p>
+                <div class="d-flex justify-content-center gap-4 flex-wrap">
+                    <div class="text-center px-4 py-3 bg-body rounded-4 shadow-sm premium-card border-0">
+                        <i class="fa-solid fa-lock fa-2x text-primary mb-3"></i>
+                        <h6 class="text-body fw-semibold mb-0">Secure Auth</h6>
+                    </div>
+                    <div class="text-center px-4 py-3 bg-body rounded-4 shadow-sm premium-card border-0">
+                        <i class="fa-solid fa-shield-halved fa-2x text-success mb-3"></i>
+                        <h6 class="text-body fw-semibold mb-0">Data Protection</h6>
+                    </div>
+                    <div class="text-center px-4 py-3 bg-body rounded-4 shadow-sm premium-card border-0">
+                        <i class="fa-solid fa-user-secret fa-2x text-info mb-3"></i>
+                        <h6 class="text-body fw-semibold mb-0">Privacy First</h6>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

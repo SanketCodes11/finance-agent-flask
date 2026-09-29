@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Super Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4 align-items-center">
+        <div class="col">
+            <h2 class="fw-bold"><i class="fa-solid fa-shield-halved text-primary me-2"></i>Super Admin Dashboard</h2>
+            <p class="text-muted">System Overview and Management Console</p>
+        </div>
+        <div class="col-auto">
+            <a href="{{ url_for('admin_db.index') }}" class="btn btn-outline-danger">
+                <i class="fa-solid fa-database me-1"></i> Database Viewer
+            </a>
+            <a href="{{ url_for('admin.activity') }}" class="btn btn-outline-info ms-2">
+                <i class="fa-solid fa-list-check me-1"></i> Activity Logs
+            </a>
+            <a href="{{ url_for('admin.settings') }}" class="btn btn-outline-warning ms-2">
+                <i class="fa-solid fa-gear me-1"></i> Platform Settings
+            </a>
+        </div>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-md-4 mb-3">
+            <div class="card shadow-sm border-0 premium-card h-100">
+                <div class="card-body">
+                    <h6 class="text-muted text-uppercase fw-bold mb-2">Total Users</h6>
+                    <h2 class="display-4 fw-bold text-primary mb-0">{{ total_users }}</h2>
+                    <a href="{{ url_for('admin.users') }}" class="text-decoration-none mt-2 d-inline-block">Manage Users &rarr;</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4 mb-3">
+            <div class="card shadow-sm border-0 premium-card h-100">
+                <div class="card-body">
+                    <h6 class="text-muted text-uppercase fw-bold mb-2">Active Admins</h6>
+                    <h2 class="display-4 fw-bold text-success mb-0">{{ active_admins }}</h2>
+                    <div class="text-muted mt-2 small">Super Admin Accounts</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4 mb-3">
+            <div class="card shadow-sm border-0 premium-card h-100">
+                <div class="card-body">
+                    <h6 class="text-muted text-uppercase fw-bold mb-2">System Tables</h6>
+                    <h2 class="display-4 fw-bold text-info mb-0">{{ total_tables }}</h2>
+                    <div class="text-muted mt-2 small">Database Schema Count</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm border-0 premium-card">
+                <div class="card-header bg-transparent border-bottom py-3">
+                    <h5 class="mb-0 fw-bold"><i class="fa-solid fa-clipboard-list text-muted me-2"></i>Recent Admin Activity</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="px-4 py-3">Timestamp (UTC)</th>
+                                    <th>Admin ID</th>
+                                    <th>Action</th>
+                                    <th>Target Table</th>
+                                    <th>Target Record</th>
+                                    <th class="px-4">Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in recent_activity %}
+                                <tr>
+                                    <td class="px-4 text-muted small">{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                    <td><span class="badge bg-secondary">User #{{ log.admin_id }}</span></td>
+                                    <td><span class="badge bg-primary">{{ log.action }}</span></td>
+                                    <td class="font-monospace text-muted">{{ log.table_name or '-' }}</td>
+                                    <td>{{ log.record_id or '-' }}</td>
+                                    <td class="px-4 small text-muted text-truncate" style="max-width: 250px;">
+                                        {{ log.details or '-' }}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-4 text-muted">No admin activity recorded yet.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

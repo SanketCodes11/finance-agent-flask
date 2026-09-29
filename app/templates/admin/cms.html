@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Content Management System - Admin Control Center{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4 align-items-center">
+        <div class="col">
+            <h2 class="fw-bold mb-0"><i class="fa-solid fa-pen-to-square text-primary me-2"></i>Content Management</h2>
+            <p class="text-muted mt-1 mb-0">Update homepage text, announcements, and banners live on the platform.</p>
+        </div>
+        <div class="col-auto">
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline-secondary">
+                <i class="fa-solid fa-arrow-left me-1"></i> Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Sidebar Navigation (Future proofing for other editors) -->
+        <div class="col-md-3 mb-4">
+            <div class="list-group shadow-sm rounded-3">
+                <a href="{{ url_for('admin.cms') }}" class="list-group-item list-group-item-action active fw-medium py-3">
+                    <i class="fa-solid fa-house me-2"></i> Homepage Editor
+                </a>
+                <a href="#" class="list-group-item list-group-item-action fw-medium py-3 text-muted disabled">
+                    <i class="fa-solid fa-graduation-cap me-2"></i> Academy & FAQs <span class="badge bg-secondary float-end">Coming Soon</span>
+                </a>
+                <a href="{{ url_for('admin.settings') }}" class="list-group-item list-group-item-action fw-medium py-3 text-muted">
+                    <i class="fa-solid fa-gears me-2"></i> Platform Settings
+                </a>
+            </div>
+        </div>
+
+        <!-- Editor Form -->
+        <div class="col-md-9">
+            <div class="card shadow-sm border-0 rounded-3">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="card-title fw-bold mb-0">Homepage Content Editor</h5>
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST" action="{{ url_for('admin.cms') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        <!-- Homepage Title -->
+                        <div class="mb-4">
+                            <label for="cms_homepage_title" class="form-label fw-bold">Hero Title (HTML Supported)</label>
+                            <input type="text" class="form-control form-control-lg" id="cms_homepage_title" name="cms_homepage_title" 
+                                   value="{{ cms_dict.get('homepage_title', 'Smarter Investing with <span class=\"text-primary\">AI Insights</span>') }}" required>
+                            <div class="form-text">The main heading displayed to guests when they visit the landing page.</div>
+                        </div>
+
+                        <!-- Homepage Subtitle -->
+                        <div class="mb-4">
+                            <label for="cms_homepage_subtitle" class="form-label fw-bold">Hero Subtitle</label>
+                            <textarea class="form-control" id="cms_homepage_subtitle" name="cms_homepage_subtitle" rows="3" required>{{ cms_dict.get('homepage_subtitle', 'Finance Insight Agent combines real-time market data, comprehensive news analysis, and AI-driven insights to help you make informed financial decisions.') }}</textarea>
+                            <div class="form-text">The descriptive paragraph directly underneath the main heading.</div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="text-muted small">
+                                <i class="fa-solid fa-circle-info me-1"></i> Changes take effect immediately upon saving.
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-lg px-4 shadow-sm" onclick="return confirm('Are you sure you want to publish these changes live to the website?');">
+                                <i class="fa-solid fa-floppy-disk me-2"></i> Save & Publish
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

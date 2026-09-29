@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid px-0">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold tracking-tight mb-0">Financial Reports</h2>
+        <button class="btn btn-primary rounded-pill px-4 fw-medium shadow-sm" onclick="window.print()"><i class="fa-solid fa-print me-2"></i> Print Report</button>
+    </div>
+    
+    <div class="card border-0 shadow-sm rounded-4 premium-card mb-4">
+        <div class="card-body p-5">
+            <div class="text-center mb-5">
+                <h3 class="fw-bold">Portfolio Summary Report</h3>
+                <p class="text-muted">Generated on <span id="reportDate"></span></p>
+            </div>
+            
+            <div class="row mb-5">
+                <div class="col-md-4 text-center">
+                    <p class="text-muted small mb-1">Total Value</p>
+                    <h4 class="fw-bold" id="repValue">--</h4>
+                </div>
+                <div class="col-md-4 text-center">
+                    <p class="text-muted small mb-1">Total Cost</p>
+                    <h4 class="fw-bold" id="repCost">--</h4>
+                </div>
+                <div class="col-md-4 text-center">
+                    <p class="text-muted small mb-1">Unrealized P/L</p>
+                    <h4 class="fw-bold" id="repPL">--</h4>
+                </div>
+            </div>
+            
+            <h5 class="fw-bold mb-3">Holdings Breakdown</h5>
+            <div class="table-responsive">
+                <table class="table table-borderless align-middle">
+                    <thead class="border-bottom">
+                        <tr class="text-muted small">
+                            <th>Symbol</th>
+                            <th>Qty</th>
+                            <th>Cost Basis</th>
+                            <th>Current Value</th>
+                        </tr>
+                    </thead>
+                    <tbody id="repHoldings">
+                        <tr><td colspan="4" class="text-center py-4">Loading report data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('reportDate').textContent = new Date().toLocaleDateString();
+fetch('/api/portfolio')
+    .then(res => res.json())
+    .then(data => {
+        let totalVal = 0, totalCost = 0, html = '';
+        if(data.length === 0) {
+            document.getElementById('repHoldings').innerHTML = '<tr><td colspan="4" class="text-center text-muted">No holdings in portfolio.</td></tr>';
+            return;
+        }
+        data.forEach(item => {
+            totalVal += item.current_value;
+            totalCost += item.total_cost;
+            html += `<tr>
+                <td class="fw-bold">${item.symbol}</td>
+                <td>${item.quantity}</td>
+                <td>${item.purchase_price.toFixed(2)}</td>
+                <td>${item.current_value.toFixed(2)}</td>
+            </tr>`;
+        });
+        document.getElementById('repValue').textContent = totalVal.toFixed(2);
+        document.getElementById('repCost').textContent = totalCost.toFixed(2);
+        
+        const pl = totalVal - totalCost;
+        const plElem = document.getElementById('repPL');
+        plElem.textContent = pl.toFixed(2);
+        plElem.className = 'fw-bold ' + (pl >= 0 ? 'text-success' : 'text-danger');
+        
+        document.getElementById('repHoldings').innerHTML = html;
+    });
+</script>
+{% endblock %}

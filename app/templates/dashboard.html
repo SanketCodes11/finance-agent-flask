@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid px-0">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <div>
+            <h2 class="fw-bold tracking-tight mb-1">Welcome back, {{ current_user.username }}</h2>
+            <p class="text-muted mb-0">Here's your financial overview for today.</p>
+        </div>
+        <div class="position-relative" style="width: 100%; max-width: 400px;">
+            <div class="input-group input-group-lg shadow-sm rounded-pill bg-body border">
+                <span class="input-group-text bg-transparent border-0 pe-1 text-muted"><i class="fa-solid fa-magnifying-glass"></i></span>
+                <input type="text" id="searchInput" class="form-control border-0 bg-transparent shadow-none" placeholder="Search for a symbol (e.g., AAPL)">
+                <button class="btn btn-primary rounded-pill px-4 m-1 fw-medium" onclick="performSearch()">Search</button>
+            </div>
+            <div id="autocompleteDropdown" class="dropdown-menu w-100 mt-2 border-0 shadow-lg" style="display: none; position: absolute; z-index: 1000;"></div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <!-- Portfolio Summary -->
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm rounded-4 premium-card h-100">
+                <div class="card-body p-4 p-xl-5 d-flex flex-column justify-content-center">
+                    <h6 class="text-muted fw-bold text-uppercase mb-4 tracking-tight"><i class="fa-solid fa-wallet me-2"></i>Portfolio Summary</h6>
+                    <div class="row g-4 text-center">
+                        <div class="col-sm-4 border-end-sm">
+                            <p class="text-muted small fw-medium mb-1">Total Value</p>
+                            <h3 class="fw-bold mb-0" id="portTotal">--</h3>
+                        </div>
+                        <div class="col-sm-4 border-end-sm">
+                            <p class="text-muted small fw-medium mb-1">Total Invested</p>
+                            <h3 class="fw-bold mb-0" id="portCost">--</h3>
+                        </div>
+                        <div class="col-sm-4">
+                            <p class="text-muted small fw-medium mb-1">Unrealized P/L</p>
+                            <h3 class="fw-bold mb-0" id="portPL">--</h3>
+                            <span id="portPLBadge" class="badge rounded-pill px-2 py-1 mt-2 d-none"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Market Movers -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm rounded-4 premium-card h-100">
+                <div class="card-body p-4">
+                    <h6 class="text-muted fw-bold text-uppercase mb-4 tracking-tight"><i class="fa-solid fa-bolt me-2"></i>US Tech Watch</h6>
+                    <div id="marketMoversContainer">
+                        <div class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div> Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-5">
+        <!-- Watchlist -->
+        <div class="col-lg-12">
+            <div class="card border-0 shadow-sm rounded-4 premium-card">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h6 class="text-muted fw-bold text-uppercase mb-0 tracking-tight"><i class="fa-solid fa-star me-2"></i>Your Watchlist</h6>
+                        <a href="/watchlist" class="btn btn-sm btn-light rounded-pill px-3 fw-medium">Manage <i class="fa-solid fa-arrow-right ms-1"></i></a>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0 border-top">
+                            <tbody id="watchlistBody">
+                                <tr><td colspan="4" class="text-center py-4 text-muted">Loading watchlist...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- News Section -->
+    <h5 class="fw-bold tracking-tight mb-4"><i class="fa-regular fa-newspaper text-primary me-2"></i>Market News</h5>
+    <div class="row g-4" id="newsContainer">
+        <div class="col-12 text-center py-5 text-muted"><div class="spinner-border spinner-border-sm me-2"></div> Loading news...</div>
+    </div>
+</div>
+
+<style>
+    @media (min-width: 576px) { .border-end-sm { border-right: 1px solid var(--brand-border); } }
+    .dropdown-item:hover { background-color: var(--bs-primary-bg-subtle); color: var(--brand-primary); }
+</style>
+{% endblock %}
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        loadPortfolioSummary();
+        loadMarketMovers();
+        loadWatchlist();
+        loadNews();
+    });
+
+    const searchInput = document.getElementById('searchInput');
+    const autocompleteDropdown = document.getElementById('autocompleteDropdown');
+    let debounceTimer;
+
+    searchInput.addEventListener('input', (e) => {
+        clearTimeout(debounceTimer);
+        const q = e.target.value.trim();
+        if(q.length < 2) { autocompleteDropdown.style.display = 'none'; return; }
+        debounceTimer = setTimeout(() => {
+            fetch(`/api/stock/autocomplete?q=${encodeURIComponent(q)}`)
+                .then(r => r.json())
+                .then(data => {
+                    autocompleteDropdown.innerHTML = '';
+                    if(data.length === 0) {
+                        autocompleteDropdown.innerHTML = '<div class="p-3 text-muted small text-center">No results found</div>';
+                    } else {
+                        data.forEach(item => {
+                            const a = document.createElement('a');
+                            a.className = 'dropdown-item py-2 d-flex justify-content-between align-items-center border-bottom';
+                            a.href = `/stock/${item.symbol}`;
+                            a.innerHTML = `<div><strong class="text-body">${item.symbol}</strong><br><small class="text-muted text-truncate d-inline-block" style="max-width:200px;">${item.name}</small></div><span class="badge bg-light text-secondary">${item.exchange}</span>`;
+                            autocompleteDropdown.appendChild(a);
+                        });
+                    }
+                    autocompleteDropdown.style.display = 'block';
+                });
+        }, 300);
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!searchInput.contains(e.target) && !autocompleteDropdown.contains(e.target)) {
+            autocompleteDropdown.style.display = 'none';
+        }
+    });
+
+    function performSearch() {
+        const q = searchInput.value.trim();
+        if(q) window.location.href = `/stock/${q.toUpperCase()}`;
+    }
+    
+    searchInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') performSearch(); });
+
+    function loadPortfolioSummary() {
+        fetch('/api/portfolio').then(res => res.json()).then(data => {
+            let totalVal = 0, totalCost = 0;
+            data.forEach(item => { totalVal += item.current_value; totalCost += item.total_cost; });
+            
+            document.getElementById('portTotal').textContent = totalVal ? totalVal.toFixed(2) : '0.00';
+            document.getElementById('portCost').textContent = totalCost ? totalCost.toFixed(2) : '0.00';
+            
+            const pl = totalVal - totalCost;
+            const plElem = document.getElementById('portPL');
+            const plBadge = document.getElementById('portPLBadge');
+            
+            if(totalCost === 0) {
+                plElem.textContent = '0.00';
+            } else {
+                plElem.textContent = pl.toFixed(2);
+                plElem.className = 'fw-bold mb-0 ' + (pl >= 0 ? 'text-success' : 'text-danger');
+                
+                const pct = (pl / totalCost) * 100;
+                plBadge.textContent = (pl >= 0 ? '+' : '') + pct.toFixed(2) + '%';
+                plBadge.className = 'badge rounded-pill px-2 py-1 mt-2 ' + (pl >= 0 ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger');
+                plBadge.classList.remove('d-none');
+            }
+        });
+    }
+
+    function loadMarketMovers() {
+        const container = document.getElementById('marketMoversContainer');
+        fetch('/api/market_indices').then(res => res.json()).then(data => {
+            container.innerHTML = '';
+            data.forEach(item => {
+                const isPos = item.change >= 0;
+                const color = isPos ? 'text-success' : 'text-danger';
+                const sign = isPos ? '+' : '';
+                container.innerHTML += `
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h6 class="mb-0 fw-bold">${item.name || item.symbol}</h6>
+                        </div>
+                        <div class="text-end">
+                            <div class="fw-bold">${item.price.toFixed(2)}</div>
+                            <div class="${color} small fw-medium">${sign}${item.change_percent.toFixed(2)}%</div>
+                        </div>
+                    </div>`;
+            });
+            if(container.lastElementChild) container.lastElementChild.classList.remove('mb-3');
+        }).catch(() => {
+            container.innerHTML = `<div class="text-muted small">Unable to load indices.</div>`;
+        });
+    }
+
+    function loadWatchlist() {
+        const tbody = document.getElementById('watchlistBody');
+        fetch('/api/watchlist').then(res => res.json()).then(data => {
+            tbody.innerHTML = '';
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-muted"><i class="fa-regular fa-star fa-2x mb-2 opacity-50"></i><br>Your watchlist is empty. Search to add stocks.</td></tr>`;
+                return;
+            }
+            
+            data.slice(0, 5).forEach(item => {
+                const tr = document.createElement('tr');
+                if (item.error) {
+                    tr.innerHTML = `<td class="ps-4 fw-bold"><a href="/stock/${item.symbol}" class="text-body text-decoration-none">${item.symbol}</a></td><td colspan="2" class="text-danger small">${item.error}</td><td class="text-end pe-4"><button class="btn btn-sm btn-light text-danger rounded-circle border-0" onclick="removeFromWatchlist('${item.symbol}')"><i class="fa-solid fa-trash"></i></button></td>`;
+                } else {
+                    const isPos = item.change >= 0;
+                    const sign = isPos ? '+' : '';
+                    tr.innerHTML = `
+                        <td class="ps-4">
+                            <a href="/stock/${item.symbol}" class="text-body text-decoration-none hover-primary fw-bold">${item.symbol}</a>
+                            <div class="small text-muted text-truncate" style="max-width: 150px;">${item.name}</div>
+                        </td>
+                        <td class="fw-semibold align-middle">${item.price.toFixed(2)}</td>
+                        <td class="align-middle">
+                            <span class="badge ${isPos ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'} rounded-pill px-2 py-1 fw-bold border ${isPos ? 'border-success-subtle' : 'border-danger-subtle'}">${sign}${item.change_percent.toFixed(2)}%</span>
+                        </td>
+                        <td class="text-end pe-4 align-middle">
+                            <a href="/stock/${item.symbol}" class="btn btn-sm btn-light border rounded-pill px-3 text-primary fw-medium">View</a>
+                        </td>
+                    `;
+                }
+                tbody.appendChild(tr);
+            });
+        }).catch(() => tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-danger">Failed to load</td></tr>');
+    }
+
+    function removeFromWatchlist(symbol) {
+        if (!confirm(`Remove ${symbol}?`)) return;
+        fetch('/api/watchlist', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content') },
+            body: JSON.stringify({ symbol: symbol })
+        }).then(res => res.json()).then(data => {
+            if (data.success) loadWatchlist();
+        });
+    }
+
+    function loadNews() {
+        const container = document.getElementById('newsContainer');
+        fetch('/api/news?q=finance').then(async res => {
+            let data; try { data = await res.json(); } catch(e) { throw {error: 'Network error'}; }
+            if(!res.ok) throw data; return data;
+        }).then(data => {
+            container.innerHTML = '';
+            const articles = data.articles || [];
+            if (articles.length === 0) {
+                container.innerHTML = '<div class="col-12"><div class="card bg-body text-center py-5 border-0 rounded-4 shadow-sm text-muted">No news available at the moment.</div></div>'; return;
+            }
+            
+            articles.slice(0, 3).forEach(article => {
+                const date = new Date(article.publishedAt).toLocaleDateString(undefined, {month:'short', day:'numeric'});
+                const img = article.urlToImage ? `<img src="${article.urlToImage}" class="card-img-top news-img-modern" alt="News Image" onerror="this.src='https://via.placeholder.com/400x200?text=No+Image'">` : `<div class="bg-secondary-subtle d-flex align-items-center justify-content-center news-img-modern"><i class="fa-regular fa-image fa-2x text-secondary"></i></div>`;
+                
+                container.innerHTML += `
+                    <div class="col-md-6 col-lg-4">
+                        <div class="card h-100 border-0 bg-body shadow-sm rounded-4 premium-card d-flex flex-column">
+                            ${img}
+                            <div class="card-body p-4 d-flex flex-column">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1 rounded-pill">${article.source}</span>
+                                    <small class="text-muted fw-medium">${date}</small>
+                                </div>
+                                <h5 class="card-title text-body fs-6 fw-bold mb-3 tracking-tight lh-base">${article.title}</h5>
+                                <a href="${article.url}" target="_blank" rel="noopener noreferrer" class="text-primary text-decoration-none mt-auto fw-semibold small">Read Full Story <i class="fa-solid fa-arrow-right ms-1"></i></a>
+                            </div>
+                        </div>
+                    </div>`;
+            });
+        }).catch(err => {
+            if(err.not_configured) {
+                container.innerHTML = `<div class="col-12"><div class="alert bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-4 shadow-sm p-4 d-flex align-items-center"><i class="fa-solid fa-triangle-exclamation fa-2x me-3"></i><div><h6 class="fw-bold mb-1">News Service Not Configured</h6><p class="mb-0 small">Please set <code>NEWS_API_KEY</code> in your environment.</p></div></div></div>`;
+            } else {
+                container.innerHTML = `<div class="col-12"><div class="alert bg-danger-subtle text-danger border border-danger-subtle rounded-4 shadow-sm">${err.error || 'Failed to load news.'}</div></div>`;
+            }
+        });
+    }
+</script>
+{% endblock %}

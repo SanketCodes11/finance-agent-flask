@@ -1,0 +1,329 @@
+{% extends "base.html" %}
+
+{% block title %}User 360: {{ user.username }} - Admin Control Center{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4 align-items-center">
+        <div class="col">
+            <h2 class="fw-bold mb-0"><i class="fa-solid fa-user-shield text-primary me-2"></i>User 360° Profile</h2>
+            <p class="text-muted mt-1 mb-0">Complete administrative view for ID #{{ user.id }}: {{ user.username }}</p>
+        </div>
+        <div class="col-auto">
+            <a href="{{ url_for('admin.users') }}" class="btn btn-outline-secondary">
+                <i class="fa-solid fa-arrow-left me-1"></i> Back to Users
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Profile Card -->
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 rounded-4 h-100">
+                <div class="card-body text-center p-4">
+                    <div class="bg-primary-subtle text-primary rounded-circle d-inline-flex align-items-center justify-content-center mb-3 shadow-sm" style="width: 80px; height: 80px;">
+                        <span class="fs-2 fw-bold">{{ user.username[0]|upper }}</span>
+                    </div>
+                    <h4 class="fw-bold mb-1">{{ user.username }}</h4>
+                    <p class="text-muted mb-3">{{ user.email }}</p>
+                    
+                    <div class="d-flex justify-content-center gap-2 mb-4">
+                        {% if user.is_admin %}
+                            <span class="badge bg-danger"><i class="fa-solid fa-shield me-1"></i> Super Admin</span>
+                        {% else %}
+                            <span class="badge bg-primary"><i class="fa-regular fa-user me-1"></i> Standard User</span>
+                        {% endif %}
+                        
+                        {% if user.is_active %}
+                            <span class="badge bg-success"><i class="fa-solid fa-check me-1"></i> Active</span>
+                        {% else %}
+                            <span class="badge bg-secondary"><i class="fa-solid fa-ban me-1"></i> Suspended</span>
+                        {% endif %}
+                    </div>
+
+                    <ul class="list-group list-group-flush text-start small">
+                        <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                            <span class="text-muted">Joined</span>
+                            <span class="fw-medium">{{ user.created_at.strftime('%Y-%m-%d') }}</span>
+                        </li>
+                        <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                            <span class="text-muted">Auth Provider</span>
+                            <span class="fw-medium">Local</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="col-md-8">
+            <div class="row g-3 h-100">
+                <div class="col-sm-6 col-lg-4">
+                    <div class="card bg-success text-white shadow-sm border-0 rounded-4 h-100">
+                        <div class="card-body p-4">
+                            <h6 class="fw-medium text-white-50 text-uppercase mb-2">Real Portfolio</h6>
+                            <h3 class="fw-bold mb-0">${{ "{:,.2f}".format(portfolio_value) }}</h3>
+                            <div class="mt-2 small opacity-75">{{ portfolio|length }} holdings</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-lg-4">
+                    <div class="card bg-primary text-white shadow-sm border-0 rounded-4 h-100">
+                        <div class="card-body p-4">
+                            <h6 class="fw-medium text-white-50 text-uppercase mb-2">Paper Trading</h6>
+                            <h3 class="fw-bold mb-0">{% if virtual_account %}${{ "{:,.2f}".format(virtual_account.balance) }}{% else %}N/A{% endif %}</h3>
+                            <div class="mt-2 small opacity-75">{% if virtual_account %}Active Account{% else %}Not Started{% endif %}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-lg-4">
+                    <div class="card bg-info text-white shadow-sm border-0 rounded-4 h-100">
+                        <div class="card-body p-4">
+                            <h6 class="fw-medium text-white-50 text-uppercase mb-2">Platform Engagement</h6>
+                            <h3 class="fw-bold mb-0">{{ watchlists|length + alerts|length + goals|length }}</h3>
+                            <div class="mt-2 small opacity-75">Active Items & Alerts</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Tabs -->
+    <div class="card shadow-sm border-0 rounded-4 mt-4">
+        <div class="card-header bg-white border-bottom pt-3 pb-0 px-4">
+            <ul class="nav nav-tabs border-bottom-0" id="userTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active fw-medium" id="portfolio-tab" data-bs-toggle="tab" data-bs-target="#portfolio" type="button" role="tab"><i class="fa-solid fa-chart-pie me-2"></i>Portfolio</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link fw-medium" id="watchlists-tab" data-bs-toggle="tab" data-bs-target="#watchlists" type="button" role="tab"><i class="fa-solid fa-list me-2"></i>Watchlists</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link fw-medium" id="alerts-tab" data-bs-toggle="tab" data-bs-target="#alerts" type="button" role="tab"><i class="fa-solid fa-bell me-2"></i>Alerts & Goals</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link fw-medium" id="paper-tab" data-bs-toggle="tab" data-bs-target="#paper" type="button" role="tab"><i class="fa-solid fa-gamepad me-2"></i>Paper Trading</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link fw-medium" id="security-tab" data-bs-toggle="tab" data-bs-target="#security" type="button" role="tab"><i class="fa-solid fa-shield-halved me-2"></i>Security</button>
+                </li>
+            </ul>
+        </div>
+        <div class="card-body p-0">
+            <div class="tab-content" id="userTabsContent">
+                
+                <!-- Portfolio Tab -->
+                <div class="tab-pane fade show active p-4" id="portfolio" role="tabpanel">
+                    {% if portfolio %}
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>Shares</th>
+                                    <th>Avg Price</th>
+                                    <th>Added On</th>
+                                    <th class="text-end">Admin Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in portfolio %}
+                                <tr>
+                                    <td><strong>{{ item.symbol }}</strong></td>
+                                    <td>{{ item.shares }}</td>
+                                    <td>${{ "{:,.2f}".format(item.avg_price) }}</td>
+                                    <td class="text-muted small">{{ item.added_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td class="text-end">
+                                        <button class="btn btn-sm btn-outline-danger disabled" title="Delete functionality coming in Stage 2"><i class="fa-solid fa-trash"></i></button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5 text-muted">
+                        <i class="fa-solid fa-folder-open fa-3x mb-3 opacity-50"></i>
+                        <h5>No Portfolio Items</h5>
+                        <p>User has not added any stocks to their real portfolio.</p>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Watchlist Tab -->
+                <div class="tab-pane fade p-4" id="watchlists" role="tabpanel">
+                    {% if watchlists %}
+                    <div class="d-flex flex-wrap gap-2">
+                        {% for item in watchlists %}
+                        <span class="badge border text-body px-3 py-2 fs-6 rounded-pill">
+                            {{ item.symbol }}
+                            <button class="btn-close ms-2" style="font-size: 0.5rem;" disabled></button>
+                        </span>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5 text-muted">
+                        <i class="fa-regular fa-star fa-3x mb-3 opacity-50"></i>
+                        <h5>Empty Watchlist</h5>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Alerts & Goals Tab -->
+                <div class="tab-pane fade p-4" id="alerts" role="tabpanel">
+                    <div class="row">
+                        <div class="col-md-6 border-end">
+                            <h6 class="fw-bold mb-3">Price Alerts</h6>
+                            {% if alerts %}
+                            <ul class="list-group list-group-flush">
+                                {% for alert in alerts %}
+                                <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>{{ alert.symbol }}</strong>
+                                        <span class="text-muted small ms-2">{% if alert.is_above %}Above{% else %}Below{% endif %} ${{ alert.target_price }}</span>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-danger disabled"><i class="fa-solid fa-trash"></i></button>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                            {% else %}
+                            <p class="text-muted small">No active alerts.</p>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6 ps-4">
+                            <h6 class="fw-bold mb-3">Financial Goals</h6>
+                            {% if goals %}
+                            <ul class="list-group list-group-flush">
+                                {% for goal in goals %}
+                                <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>{{ goal.name }}</strong>
+                                        <div class="progress mt-1" style="height: 5px; width: 150px;">
+                                            {% set pct = (goal.current_amount / goal.target_amount * 100) if goal.target_amount else 0 %}
+                                            <div class="progress-bar bg-success" role="progressbar" style="width: {{ pct }}%"></div>
+                                        </div>
+                                    </div>
+                                    <span class="fw-medium">${{ "{:,.0f}".format(goal.target_amount) }}</span>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                            {% else %}
+                            <p class="text-muted small">No financial goals set.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Paper Trading Tab -->
+                <div class="tab-pane fade p-4" id="paper" role="tabpanel">
+                    {% if virtual_orders %}
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <h6 class="fw-bold">Virtual Account Cash Balance: <span class="text-success">${% if virtual_account %}{{ "{:,.2f}".format(virtual_account.current_cash) }}{% else %}0.00{% endif %}</span></h6>
+                        </div>
+                    </div>
+                    <div class="row">
+                    <div class="col-md-6">
+                    <h6 class="fw-bold mb-3">Recent Virtual Orders</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Symbol</th>
+                                    <th>Shares</th>
+                                    <th>Price</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in virtual_orders %}
+                                <tr>
+                                    <td class="text-muted small">{{ order.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td><span class="badge {% if order.order_type == 'BUY' %}bg-success{% else %}bg-danger{% endif %}">{{ order.order_type }}</span></td>
+                                    <td><strong>{{ order.symbol }}</strong></td>
+                                    <td>{{ order.shares }}</td>
+                                    <td>${{ "{:,.2f}".format(order.price) }}</td>
+                                    <td>{{ order.status }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5 text-muted">
+                        <p>No paper trading activity found.</p>
+                    </div>
+                    {% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="fw-bold mb-3">Wallet Transactions (Deposits/Withdrawals)</h6>
+                        {% if wallet_txs %}
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Type</th>
+                                        <th>Amount</th>
+                                        <th>Resulting Balance</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for tx in wallet_txs %}
+                                    <tr>
+                                        <td class="text-muted small">{{ tx.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                                        <td><span class="badge {% if tx.transaction_type == 'DEPOSIT' %}bg-success{% else %}bg-secondary{% endif %}">{{ tx.transaction_type }}</span></td>
+                                        <td>${{ "{:,.2f}".format(tx.amount) }}</td>
+                                        <td>${{ "{:,.2f}".format(tx.resulting_balance) }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="text-center py-5 text-muted">
+                            <p>No wallet transactions found.</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                    </div>
+                </div>
+
+                <!-- Security Tab -->
+                <div class="tab-pane fade p-4" id="security" role="tabpanel">
+                    <h6 class="fw-bold mb-3">Recent Logins</h6>
+                    {% if recent_logins %}
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Date/Time</th>
+                                    <th>IP Address</th>
+                                    <th>Browser / User-Agent</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for login in recent_logins %}
+                                <tr>
+                                    <td class="text-muted small">{{ login.login_time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                    <td><code>{{ login.ip_address }}</code></td>
+                                    <td class="text-muted small text-truncate" style="max-width: 300px;">{{ login.user_agent }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted small">No login history available.</p>
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

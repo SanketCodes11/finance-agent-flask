@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center align-items-center" style="min-height: 75vh;">
+    <div class="col-md-6 col-lg-5">
+        <div class="card bg-body border-0 shadow-lg mt-4 premium-card rounded-4">
+            <div class="card-header bg-transparent border-0 text-center pt-5 pb-2">
+                <div class="bg-primary-subtle text-primary rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 64px; height: 64px;">
+                    <i class="fa-solid fa-user-plus fa-2x"></i>
+                </div>
+                <h3 class="fw-bold tracking-tight mb-1">Create Account</h3>
+                <p class="text-muted mb-0 small">Join Finance Insight Agent</p>
+            </div>
+            <div class="card-body p-4 p-sm-5 pt-3">
+                <form method="POST" action="{{ url_for('auth.register') }}" id="registerForm" novalidate>
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    
+                    <div class="mb-3 position-relative">
+                        <label for="username" class="form-label text-muted fw-medium small">Username</label>
+                        <input type="text" class="form-control form-control-lg bg-body-tertiary border-0 rounded-3 px-3 py-2" id="username" name="username" value="{{ username|default('') }}" required autocomplete="username">
+                        <div class="invalid-feedback">Must be at least 3 characters and alphanumeric.</div>
+                    </div>
+                    
+                    <div class="mb-3 position-relative">
+                        <label for="email" class="form-label text-muted fw-medium small">Email address</label>
+                        <input type="email" class="form-control form-control-lg bg-body-tertiary border-0 rounded-3 px-3 py-2" id="email" name="email" value="{{ email|default('') }}" required autocomplete="email">
+                        <div class="invalid-feedback">Please enter a valid email address.</div>
+                    </div>
+                    
+                    <div class="mb-3 position-relative">
+                        <label for="password" class="form-label text-muted fw-medium small">Password</label>
+                        <input type="password" class="form-control form-control-lg bg-body-tertiary border-0 rounded-3 px-3 py-2" id="password" name="password" required autocomplete="new-password">
+                        <div class="invalid-feedback" id="passwordFeedback">Must be at least 8 chars with uppercase, lowercase, and number.</div>
+                        <div class="progress mt-2 bg-secondary-subtle" style="height: 4px; border-radius: 2px;">
+                            <div class="progress-bar bg-danger" id="pwdStrength" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4 position-relative">
+                        <label for="password_confirm" class="form-label text-muted fw-medium small">Confirm Password</label>
+                        <input type="password" class="form-control form-control-lg bg-body-tertiary border-0 rounded-3 px-3 py-2" id="password_confirm" name="password_confirm" required autocomplete="new-password">
+                        <div class="invalid-feedback">Passwords do not match.</div>
+                    </div>
+                    
+                    <div class="d-grid mt-2">
+                        <button type="submit" class="btn btn-primary btn-lg rounded-pill fw-semibold shadow-sm" id="submitBtn">
+                            <span class="spinner-border spinner-border-sm d-none me-2" id="submitSpinner" role="status" aria-hidden="true"></span>
+                            <span id="submitText">Create Account</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <div class="card-footer bg-transparent border-top border-opacity-10 text-center py-4">
+                <p class="mb-0 text-muted small fw-medium">Already have an account? <a href="{{ url_for('auth.login') }}" class="text-primary text-decoration-none ms-1">Login</a></p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('registerForm');
+    const username = document.getElementById('username');
+    const email = document.getElementById('email');
+    const password = document.getElementById('password');
+    const passwordConfirm = document.getElementById('password_confirm');
+    const submitBtn = document.getElementById('submitBtn');
+    const submitSpinner = document.getElementById('submitSpinner');
+    const submitText = document.getElementById('submitText');
+    const pwdStrength = document.getElementById('pwdStrength');
+
+    function checkPasswordStrength(pwd) {
+        let score = 0;
+        if (pwd.length >= 8) score += 25;
+        if (/[A-Z]/.test(pwd)) score += 25;
+        if (/[a-z]/.test(pwd)) score += 25;
+        if (/\d/.test(pwd)) score += 25;
+        
+        pwdStrength.style.width = score + '%';
+        if (score <= 50) {
+            pwdStrength.className = 'progress-bar bg-danger';
+        } else if (score === 75) {
+            pwdStrength.className = 'progress-bar bg-warning';
+        } else {
+            pwdStrength.className = 'progress-bar bg-success';
+        }
+        return score === 100;
+    }
+
+    password.addEventListener('input', function() {
+        checkPasswordStrength(this.value);
+        if (passwordConfirm.value) {
+            passwordConfirm.classList.toggle('is-invalid', password.value !== passwordConfirm.value);
+            passwordConfirm.classList.toggle('is-valid', password.value === passwordConfirm.value);
+        }
+    });
+
+    passwordConfirm.addEventListener('input', function() {
+        this.classList.toggle('is-invalid', password.value !== this.value);
+        this.classList.toggle('is-valid', password.value === this.value);
+    });
+
+    username.addEventListener('input', function() {
+        const isValid = this.value.length >= 3 && /^[a-zA-Z0-9_]+$/.test(this.value);
+        this.classList.toggle('is-invalid', !isValid);
+        this.classList.toggle('is-valid', isValid);
+    });
+
+    email.addEventListener('input', function() {
+        const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.value);
+        this.classList.toggle('is-invalid', !isValid);
+        this.classList.toggle('is-valid', isValid);
+    });
+
+    form.addEventListener('submit', function(event) {
+        let isValid = true;
+        
+        // Final check before submit
+        if (username.value.length < 3 || !/^[a-zA-Z0-9_]+$/.test(username.value)) {
+            username.classList.add('is-invalid');
+            isValid = false;
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
+            email.classList.add('is-invalid');
+            isValid = false;
+        }
+        if (!checkPasswordStrength(password.value)) {
+            password.classList.add('is-invalid');
+            isValid = false;
+        }
+        if (password.value !== passwordConfirm.value) {
+            passwordConfirm.classList.add('is-invalid');
+            isValid = false;
+        }
+
+        if (!isValid) {
+            event.preventDefault();
+            event.stopPropagation();
+        } else {
+            submitBtn.disabled = true;
+            submitSpinner.classList.remove('d-none');
+            submitText.textContent = 'Registering...';
+        }
+    });
+});
+</script>
+{% endblock %}

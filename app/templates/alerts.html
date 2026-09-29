@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid px-0">
+    <h2 class="fw-bold tracking-tight mb-4">Price Alerts</h2>
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm rounded-4 premium-card">
+                <div class="card-body p-4">
+                    <h5 class="fw-bold mb-3">Create Alert</h5>
+                    <div class="mb-3">
+                        <label class="form-label text-muted fw-medium">Symbol</label>
+                        <input type="text" id="alertSymbol" class="form-control rounded-pill bg-body-tertiary border-0 px-4" placeholder="e.g. AAPL">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted fw-medium">Condition</label>
+                        <select id="alertCondition" class="form-select rounded-pill bg-body-tertiary border-0 px-4">
+                            <option value="above">Goes Above</option>
+                            <option value="below">Goes Below</option>
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label text-muted fw-medium">Target Price</label>
+                        <input type="number" id="alertPrice" class="form-control rounded-pill bg-body-tertiary border-0 px-4" placeholder="0.00">
+                    </div>
+                    <button id="saveAlertBtn" class="btn btn-primary rounded-pill w-100 fw-semibold shadow-sm">Save Alert</button>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8">
+            <div class="card border-0 shadow-sm rounded-4 premium-card h-100">
+                <div class="card-body p-4">
+                    <h5 class="fw-bold mb-4">My Alerts</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th class="ps-3 text-muted fw-semibold small text-uppercase">Symbol</th>
+                                    <th class="text-muted fw-semibold small text-uppercase">Condition</th>
+                                    <th class="text-muted fw-semibold small text-uppercase">Target</th>
+                                    <th class="text-muted fw-semibold small text-uppercase">Status</th>
+                                    <th class="text-muted fw-semibold small text-uppercase text-end">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="alertsList">
+                                <tr>
+                                    <td colspan="5" class="text-center py-4 text-muted">Loading alerts...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+    function loadAlerts() {
+        fetch('/api/alerts')
+            .then(res => res.json())
+            .then(data => {
+                const list = document.getElementById('alertsList');
+                if(!data.length) {
+                    list.innerHTML = '<tr><td colspan="5" class="text-center py-5 text-muted"><i class="fa-regular fa-bell fa-2x mb-3 text-secondary opacity-50"></i><p class="mb-0">No alerts found.</p></td></tr>';
+                    return;
+                }
+                
+                // Sort data: active first, then triggered by most recent
+                data.sort((a, b) => {
+                    if (a.is_active === b.is_active) {
+                        return (b.id - a.id);
+                    }
+                    return a.is_active ? -1 : 1;
+                });
+                
+                let html = '';
+                data.forEach(a => {
+                    const statusHtml = a.is_active 
+                        ? `<span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2 py-1"><i class="fa-solid fa-spinner fa-spin-pulse me-1"></i> Active</span>` 
+                        : `<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1"><i class="fa-solid fa-check me-1"></i> Triggered</span>
+                           <div class="small text-muted mt-1" style="font-size: 0.75rem;">${a.triggered_at}</div>`;
+                    
+                    const conditionHtml = a.condition.toUpperCase() === 'ABOVE' 
+                        ? `<i class="fa-solid fa-arrow-trend-up text-success me-1"></i> Above` 
+                        : `<i class="fa-solid fa-arrow-trend-down text-danger me-1"></i> Below`;
+
+                    html += `
+                    <tr>
+                        <td class="ps-3 fw-bold">${a.symbol}</td>
+                        <td class="fw-medium">${conditionHtml}</td>
+                        <td class="fw-semibold">${a.target_price.toFixed(2)}</td>
+                        <td>${statusHtml}</td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-light border text-danger rounded-pill" onclick="deleteAlert(${a.id})" title="Delete Alert">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>`;
+                });
+                list.innerHTML = html;
+            });
+    }
+
+    document.getElementById('saveAlertBtn').addEventListener('click', () => {
+        const payload = {
+            symbol: document.getElementById('alertSymbol').value.toUpperCase(),
+            condition: document.getElementById('alertCondition').value,
+            target_price: parseFloat(document.getElementById('alertPrice').value)
+        };
+        fetch('/api/alerts', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')},
+            body: JSON.stringify(payload)
+        }).then(res => res.json()).then(() => {
+            document.getElementById('alertSymbol').value = '';
+            document.getElementById('alertPrice').value = '';
+            loadAlerts();
+        });
+    });
+
+    function deleteAlert(id) {
+        fetch(`/api/alerts/${id}`, {
+            method: 'DELETE',
+            headers: {'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')}
+        }).then(() => loadAlerts());
+    }
+
+    document.addEventListener('DOMContentLoaded', loadAlerts);
+</script>
+{% endblock %}

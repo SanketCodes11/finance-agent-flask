@@ -1,0 +1,357 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <div class="row align-items-center mb-4">
+        <div class="col-md-8">
+            <h2 class="fw-bold tracking-tight mb-1"><i class="fa-solid fa-filter text-primary me-2"></i> Stock Screener</h2>
+            <p class="text-muted mb-0">Discover and filter stocks across global markets.</p>
+        </div>
+        <div class="col-md-4 text-md-end mt-3 mt-md-0">
+            <button class="btn btn-outline-secondary rounded-pill px-4 fw-medium shadow-sm" onclick="triggerRefresh()" id="refreshBtn">
+                <i class="fa-solid fa-rotate-right me-1"></i> Refresh Data
+            </button>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Sidebar Filters -->
+        <div class="col-lg-3">
+            <div class="card border-0 shadow-sm rounded-4 premium-card mb-4">
+                <div class="card-header bg-transparent border-bottom py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0 fw-bold"><i class="fa-solid fa-sliders me-2"></i> Filters</h6>
+                        <button class="btn btn-sm btn-link text-decoration-none text-muted p-0" onclick="resetFilters()">Reset</button>
+                    </div>
+                </div>
+                <div class="card-body p-4">
+                    <form id="filterForm" onsubmit="event.preventDefault(); loadResults(1);">
+                        <!-- Search -->
+                        <div class="mb-4">
+                            <label class="form-label text-muted small fw-bold text-uppercase tracking-wide">Search</label>
+                            <input type="text" class="form-control bg-body-tertiary border-0" id="filterSearch" placeholder="Symbol or Name">
+                        </div>
+
+                        <!-- Exchange -->
+                        <div class="mb-4">
+                            <label class="form-label text-muted small fw-bold text-uppercase tracking-wide">Exchange</label>
+                            <select class="form-select bg-body-tertiary border-0" id="filterExchange">
+                                <option value="">All Markets</option>
+                                <option value="US">US Markets</option>
+                                <option value="NSE">India (NSE)</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Sector -->
+                        <div class="mb-4">
+                            <label class="form-label text-muted small fw-bold text-uppercase tracking-wide">Sector</label>
+                            <select class="form-select bg-body-tertiary border-0" id="filterSector">
+                                <option value="">All Sectors</option>
+                            </select>
+                        </div>
+
+                        <!-- Price -->
+                        <div class="mb-4">
+                            <label class="form-label text-muted small fw-bold text-uppercase tracking-wide">Price Range</label>
+                            <div class="input-group input-group-sm mb-2">
+                                <span class="input-group-text bg-body-tertiary border-0">Min</span>
+                                <input type="number" class="form-control bg-body-tertiary border-0" id="filterMinPrice" step="any">
+                            </div>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-body-tertiary border-0">Max</span>
+                                <input type="number" class="form-control bg-body-tertiary border-0" id="filterMaxPrice" step="any">
+                            </div>
+                        </div>
+
+                        <!-- Market Cap -->
+                        <div class="mb-4">
+                            <label class="form-label text-muted small fw-bold text-uppercase tracking-wide">Market Cap (Millions)</label>
+                            <div class="input-group input-group-sm mb-2">
+                                <span class="input-group-text bg-body-tertiary border-0">Min</span>
+                                <input type="number" class="form-control bg-body-tertiary border-0" id="filterMinCap" step="any">
+                            </div>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-body-tertiary border-0">Max</span>
+                                <input type="number" class="form-control bg-body-tertiary border-0" id="filterMaxCap" step="any">
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100 rounded-pill fw-medium">Apply Filters</button>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="alert alert-info border-info-subtle shadow-sm rounded-4 d-flex align-items-center">
+                <i class="fa-solid fa-circle-info fa-lg me-3 text-info"></i>
+                <div>
+                    <p class="mb-0 fw-medium small text-dark">This screener relies on cached data for efficiency. Click <strong>Refresh Data</strong> to update market quotes in the background.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Table -->
+        <div class="col-lg-9">
+            <div class="card border-0 shadow-sm rounded-4 premium-card">
+                <div class="card-header bg-transparent border-bottom py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h6 class="mb-0 fw-bold"><span id="resultCount">0</span> Results</h6>
+                    
+                    <div class="d-flex align-items-center gap-2">
+                        <label class="text-muted small fw-medium text-nowrap">Sort By:</label>
+                        <select class="form-select form-select-sm bg-body-tertiary border-0 w-auto" id="sortColumn" onchange="loadResults(1)">
+                            <option value="market_cap">Market Cap</option>
+                            <option value="price">Price</option>
+                            <option value="pe_ratio">P/E Ratio</option>
+                            <option value="volume">Volume</option>
+                            <option value="symbol">Symbol</option>
+                        </select>
+                        <select class="form-select form-select-sm bg-body-tertiary border-0 w-auto" id="sortOrder" onchange="loadResults(1)">
+                            <option value="desc">Desc</option>
+                            <option value="asc">Asc</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="card-body p-0 position-relative">
+                    <div id="tableOverlay" class="position-absolute top-0 start-0 w-100 h-100 bg-body bg-opacity-75 d-flex justify-content-center align-items-center d-none" style="z-index: 10;">
+                        <div class="spinner-border text-primary" role="status"></div>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0 text-nowrap">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-4">Symbol</th>
+                                    <th>Price</th>
+                                    <th>Market Cap</th>
+                                    <th>P/E</th>
+                                    <th>Volume</th>
+                                    <th class="pe-4 text-end">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="resultsTableBody">
+                                <!-- Results will go here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Pagination -->
+                <div class="card-footer bg-transparent border-top p-3 d-flex justify-content-between align-items-center">
+                    <div class="text-muted small" id="pageInfo"></div>
+                    <ul class="pagination pagination-sm mb-0" id="paginationControls">
+                        <!-- Pagination buttons -->
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentPage = 1;
+    let sectorsLoaded = false;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadResults(1);
+    });
+
+    function resetFilters() {
+        document.getElementById('filterForm').reset();
+        loadResults(1);
+    }
+
+    function formatNumber(num) {
+        if (num === null || num === undefined) return '--';
+        if (num >= 1e12) return (num / 1e12).toFixed(2) + 'T';
+        if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
+        if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
+        if (num >= 1e3) return (num / 1e3).toFixed(2) + 'k';
+        return num.toLocaleString();
+    }
+
+    function loadResults(page) {
+        currentPage = page;
+        document.getElementById('tableOverlay').classList.remove('d-none');
+        
+        const params = new URLSearchParams({
+            page: page,
+            per_page: 20,
+            sort_by: document.getElementById('sortColumn').value,
+            sort_order: document.getElementById('sortOrder').value
+        });
+
+        const search = document.getElementById('filterSearch').value.trim();
+        if (search) params.append('search', search);
+
+        const exchange = document.getElementById('filterExchange').value;
+        if (exchange) params.append('exchange', exchange);
+        
+        const sector = document.getElementById('filterSector').value;
+        if (sector) params.append('sector', sector);
+
+        const minPrice = document.getElementById('filterMinPrice').value;
+        if (minPrice) params.append('min_price', minPrice);
+        
+        const maxPrice = document.getElementById('filterMaxPrice').value;
+        if (maxPrice) params.append('max_price', maxPrice);
+
+        const minCap = document.getElementById('filterMinCap').value;
+        // The user enters in Millions, so multiply by 1e6 before sending
+        if (minCap) params.append('min_cap', minCap * 1e6);
+        
+        const maxCap = document.getElementById('filterMaxCap').value;
+        if (maxCap) params.append('max_cap', maxCap * 1e6);
+
+        fetch(`/api/screener/results?${params.toString()}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.error) throw new Error(data.error);
+                
+                // Populate sectors dropdown if not loaded
+                if (!sectorsLoaded && data.sectors) {
+                    const sectorSelect = document.getElementById('filterSector');
+                    data.sectors.forEach(s => {
+                        const opt = document.createElement('option');
+                        opt.value = s;
+                        opt.textContent = s;
+                        sectorSelect.appendChild(opt);
+                    });
+                    sectorsLoaded = true;
+                }
+                
+                document.getElementById('resultCount').textContent = data.total;
+                
+                const tbody = document.getElementById('resultsTableBody');
+                if (data.results.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-5 text-muted">No stocks match your criteria.</td></tr>`;
+                } else {
+                    let html = '';
+                    data.results.forEach(item => {
+                        const wlBtn = item.is_watchlisted 
+                            ? `<button class="btn btn-sm btn-success rounded-pill px-3" disabled><i class="fa-solid fa-check me-1"></i> Added</button>`
+                            : `<button class="btn btn-sm btn-outline-primary rounded-pill px-3" onclick="addToWatchlist('${item.symbol}', this)"><i class="fa-solid fa-plus me-1"></i> Watch</button>`;
+                            
+                        const currency = item.exchange === 'NSE' ? '₹' : '$';
+                        const priceDisplay = item.price !== null ? `${currency}${item.price.toFixed(2)}` : '--';
+                        
+                        html += `
+                            <tr>
+                                <td class="ps-4">
+                                    <div class="d-flex flex-column">
+                                        <a href="/stock/${item.symbol}" class="fw-bold text-body text-decoration-none">${item.symbol}</a>
+                                        <small class="text-muted text-truncate" style="max-width:200px;">${item.company_name || '--'}</small>
+                                    </div>
+                                </td>
+                                <td class="fw-medium">${priceDisplay}</td>
+                                <td>${item.market_cap !== null ? formatNumber(item.market_cap) : '--'}</td>
+                                <td>${item.pe_ratio !== null ? item.pe_ratio.toFixed(2) : '--'}</td>
+                                <td>${item.volume !== null ? formatNumber(item.volume) : '--'}</td>
+                                <td class="pe-4 text-end">
+                                    ${wlBtn}
+                                </td>
+                            </tr>
+                        `;
+                    });
+                    tbody.innerHTML = html;
+                }
+                
+                // Update pagination
+                document.getElementById('pageInfo').textContent = `Showing page ${data.page} of ${data.pages}`;
+                
+                const pag = document.getElementById('paginationControls');
+                let pagHtml = '';
+                
+                if (data.has_prev) {
+                    pagHtml += `<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadResults(${data.page - 1})">Prev</a></li>`;
+                } else {
+                    pagHtml += `<li class="page-item disabled"><a class="page-link" href="#">Prev</a></li>`;
+                }
+                
+                if (data.has_next) {
+                    pagHtml += `<li class="page-item"><a class="page-link" href="javascript:void(0)" onclick="loadResults(${data.page + 1})">Next</a></li>`;
+                } else {
+                    pagHtml += `<li class="page-item disabled"><a class="page-link" href="#">Next</a></li>`;
+                }
+                
+                pag.innerHTML = pagHtml;
+            })
+            .catch(err => {
+                const tbody = document.getElementById('resultsTableBody');
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-5 text-danger"><i class="fa-solid fa-triangle-exclamation me-2"></i> ${err.message}</td></tr>`;
+            })
+            .finally(() => {
+                document.getElementById('tableOverlay').classList.add('d-none');
+            });
+    }
+
+    function triggerRefresh() {
+        const btn = document.getElementById('refreshBtn');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Starting...`;
+        btn.disabled = true;
+
+        fetch('/api/screener/refresh', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                btn.innerHTML = `<i class="fa-solid fa-check text-success me-1"></i> Running`;
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                }, 3000);
+            } else {
+                throw new Error(data.message);
+            }
+        })
+        .catch(err => {
+            btn.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-danger me-1"></i> Failed`;
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }, 3000);
+            alert(err.message);
+        });
+    }
+
+    function addToWatchlist(symbol, btnElem) {
+        btnElem.disabled = true;
+        btnElem.innerHTML = `<span class="spinner-border spinner-border-sm"></span>`;
+        
+        fetch('/api/watchlist', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({ symbol: symbol })
+        })
+        .then(async res => {
+            const contentType = res.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const text = await res.text();
+                throw new Error(res.status === 401 ? 'Unauthorized. Please login.' : 'Server returned an invalid non-JSON response.');
+            }
+            return res.json();
+        })
+        .then(data => {
+            if (data.success) {
+                btnElem.outerHTML = `<button class="btn btn-sm btn-success rounded-pill px-3" disabled><i class="fa-solid fa-check me-1"></i> Added</button>`;
+            } else {
+                throw new Error(data.error);
+            }
+        })
+        .catch(err => {
+            btnElem.disabled = false;
+            btnElem.innerHTML = `<i class="fa-solid fa-plus me-1"></i> Watch`;
+            alert(err.message || 'Failed to add to watchlist');
+        });
+    }
+</script>
+{% endblock %}

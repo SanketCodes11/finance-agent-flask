@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mb-4 align-items-center">
+    <div class="col-md-8">
+        <h2 class="text-body mb-0"><i class="fa-solid fa-star text-warning me-2"></i>My Watchlist</h2>
+        <p class="text-muted">Track and manage your favorite stocks and instruments.</p>
+    </div>
+    <div class="col-md-4 text-md-end mt-3 mt-md-0 position-relative">
+        <form class="d-flex search-form position-relative" id="watchlistSearchForm">
+            <div class="input-group">
+                <span class="input-group-text bg-body border-0 shadow-sm premium-card text-muted">
+                    <i class="fa-solid fa-magnifying-glass" id="watchlistSearchIcon"></i>
+                </span>
+                <input type="text" id="watchlistSymbolInput" class="form-control bg-body border-0 shadow-sm premium-card text-body" placeholder="Search to add..." autocomplete="off">
+            </div>
+        </form>
+        <div id="watchlistAutocompleteDropdown" class="list-group position-absolute w-100 d-none shadow-lg mt-1 text-start" style="z-index: 1000; max-height: 400px; overflow-y: auto;">
+        </div>
+    </div>
+</div>
+
+<div class="card bg-body border-0 shadow-sm premium-card shadow-sm">
+    <div class="card-header bg-body border-0 shadow-sm premium-card d-flex justify-content-between align-items-center py-2">
+        <h6 class="mb-0 text-body fw-bold">Watchlist Performance</h6>
+        <button class="btn btn-sm btn-outline-secondary" id="refreshFullWatchlistBtn">
+            <i class="fa-solid fa-rotate-right"></i> Refresh
+        </button>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover table-hover mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th class="ps-4">Company</th>
+                        <th>Symbol</th>
+                        <th>Market</th>
+                        <th>Price</th>
+                        <th>Change</th>
+                        <th>Change %</th>
+                        <th class="text-end pe-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="fullWatchlistBody">
+                    <tr>
+                        <td colspan="7" class="text-center py-5 text-muted">
+                            <div class="spinner-border text-primary mb-3" role="status"></div>
+                            <p class="mb-0">Loading your watchlist data...</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        loadFullWatchlist();
+
+        document.getElementById('refreshFullWatchlistBtn').addEventListener('click', loadFullWatchlist);
+
+        // Autocomplete Search logic for Watchlist page
+        const searchInput = document.getElementById('watchlistSymbolInput');
+        const dropdown = document.getElementById('watchlistAutocompleteDropdown');
+        const searchIcon = document.getElementById('watchlistSearchIcon');
+        let searchTimeout;
+
+        document.getElementById('watchlistSearchForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+        });
+
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            const query = this.value.trim();
+            
+            if (query.length < 2) {
+                dropdown.classList.add('d-none');
+                searchIcon.className = 'fa-solid fa-magnifying-glass';
+                return;
+            }
+
+            searchIcon.className = 'fa-solid fa-spinner fa-spin text-primary';
+            
+            searchTimeout = setTimeout(() => {
+                fetch(`/api/stock/autocomplete?q=${encodeURIComponent(query)}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        searchIcon.className = 'fa-solid fa-magnifying-glass';
+                        dropdown.innerHTML = '';
+                        
+                        if (data.error || data.length === 0) {
+                            dropdown.innerHTML = `<div class="list-group-item bg-body border-0 shadow-sm premium-card text-muted">No results found for "${query}"</div>`;
+                        } else {
+                            data.forEach(item => {
+                                const btn = document.createElement('button');
+                                btn.type = 'button';
+                                btn.className = 'list-group-item list-group-item-action bg-body border-0 shadow-sm premium-card text-body hover-primary py-2 d-flex flex-column text-start';
+                                btn.innerHTML = `
+                                    <div class="d-flex justify-content-between align-items-center w-100">
+                                        <span class="fw-bold text-primary">${item.symbol}</span>
+                                        <span class="badge bg-secondary-subtle text-secondary text-body px-2 py-1">${item.exchange}</span>
+                                    </div>
+                                    <span class="text-truncate text-muted small" style="max-width: 100%;">${item.name}</span>
+                                `;
+                                btn.onclick = function() {
+                                    addToWatchlist(item.symbol);
+                                    dropdown.classList.add('d-none');
+                                    searchInput.value = '';
+                                };
+                                dropdown.appendChild(btn);
+                            });
+                        }
+                        dropdown.classList.remove('d-none');
+                    })
+                    .catch(() => {
+                        searchIcon.className = 'fa-solid fa-magnifying-glass';
+                        dropdown.classList.add('d-none');
+                    });
+            }, 400);
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+                dropdown.classList.add('d-none');
+            }
+        });
+        
+        searchInput.addEventListener('focus', function() {
+            if (dropdown.innerHTML && this.value.trim().length >= 2) {
+                dropdown.classList.remove('d-none');
+            }
+        });
+    });
+
+    function addToWatchlist(symbol) {
+        fetch('/api/watchlist', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({ symbol: symbol })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                loadFullWatchlist();
+            } else {
+                alert(data.error || 'Failed to add to watchlist');
+            }
+        });
+    }
+
+    function loadFullWatchlist() {
+        const tbody = document.getElementById('fullWatchlistBody');
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="text-center py-5 text-muted">
+                    <div class="spinner-border text-primary mb-3" role="status"></div>
+                    <p class="mb-0">Updating data...</p>
+                </td>
+            </tr>
+        `;
+        
+        fetch('/api/watchlist')
+            .then(res => res.json())
+            .then(data => {
+                tbody.innerHTML = '';
+                if (data.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="7" class="text-center py-5 text-muted">
+                                <i class="fa-solid fa-star fa-3x mb-3 text-muted opacity-50"></i>
+                                <h5>Your watchlist is empty</h5>
+                                <p class="mb-0">Use the search bar above to add stocks.</p>
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+                
+                data.forEach(item => {
+                    const tr = document.createElement('tr');
+                    
+                    const nameCell = `<td class="ps-4 text-body fw-bold">${item.name || item.symbol}</td>`;
+                    const symbolCell = `<td><a href="/stock/${item.symbol}" class="text-decoration-none hover-primary fw-bold text-primary">${item.symbol}</a></td>`;
+                    const marketCell = `<td><span class="badge bg-secondary-subtle text-secondary text-body">${item.exchange || 'Unknown'}</span></td>`;
+                    
+                    if (item.error) {
+                        tr.innerHTML = `
+                            ${nameCell}
+                            ${symbolCell}
+                            ${marketCell}
+                            <td colspan="3" class="text-danger small"><i class="fa-solid fa-circle-exclamation me-1"></i> ${item.error}</td>
+                            <td class="text-end pe-4">
+                                <button class="btn btn-sm btn-light text-danger border-0" onclick="removeFullWatchlist('${item.symbol}')"><i class="fa-solid fa-trash"></i></button>
+                            </td>
+                        `;
+                    } else {
+                        const isPos = item.change >= 0;
+                        const colorClass = isPos ? 'text-success' : 'text-danger';
+                        const sign = isPos ? '+' : '';
+                        
+                        let priceDisplay = `${item.price.toFixed(2)} <span class="small text-muted">${item.currency}</span>`;
+                        if (item.inr_price) {
+                            priceDisplay += `<br><small class="text-muted"><i class="fa-solid fa-indian-rupee-sign"></i> ${item.inr_price.toFixed(2)}</small>`;
+                        }
+                        
+                        tr.innerHTML = `
+                            ${nameCell}
+                            ${symbolCell}
+                            ${marketCell}
+                            <td>${priceDisplay}</td>
+                            <td class="${colorClass}">${sign}${item.change.toFixed(2)}</td>
+                            <td class="${colorClass}"><span class="badge ${isPos ? 'bg-success' : 'bg-danger'} bg-opacity-25 ${colorClass}">${sign}${item.change_percent.toFixed(2)}%</span></td>
+                            <td class="text-end pe-4">
+                                <a href="/news?q=${encodeURIComponent(item.name || item.symbol)}" class="btn btn-sm btn-light text-info border-0 me-1" title="View News"><i class="fa-regular fa-newspaper"></i></a>
+                                <a href="/stock/${item.symbol}" class="btn btn-sm btn-light text-primary border-0 me-1" title="View Details"><i class="fa-solid fa-chart-line"></i></a>
+                                <button class="btn btn-sm btn-light text-danger border-0" onclick="removeFullWatchlist('${item.symbol}')" title="Remove"><i class="fa-solid fa-trash"></i></button>
+                            </td>
+                        `;
+                    }
+                    tbody.appendChild(tr);
+                });
+            })
+            .catch(err => {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-5 text-danger"><i class="fa-solid fa-triangle-exclamation fa-2x mb-2"></i><br>Failed to load watchlist.</td></tr>';
+            });
+    }
+
+    function removeFullWatchlist(symbol) {
+        if (!confirm(`Remove ${symbol} from watchlist?`)) return;
+        
+        fetch('/api/watchlist', {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({ symbol: symbol })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                loadFullWatchlist();
+            } else {
+                alert(data.error || 'Failed to remove');
+            }
+        });
+    }
+</script>
+{% endblock %}

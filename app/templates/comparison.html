@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid px-0">
+    <h2 class="fw-bold tracking-tight mb-4">Stock Comparison</h2>
+    <div class="card border-0 shadow-sm rounded-4 premium-card mb-4">
+        <div class="card-body p-4">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label fw-medium text-muted">Stock 1 (e.g. AAPL)</label>
+                    <input type="text" id="sym1" class="form-control rounded-pill bg-body-tertiary border-0 px-4" placeholder="Symbol 1">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-medium text-muted">Stock 2 (e.g. MSFT)</label>
+                    <input type="text" id="sym2" class="form-control rounded-pill bg-body-tertiary border-0 px-4" placeholder="Symbol 2">
+                </div>
+                <div class="col-md-4">
+                    <button id="compareBtn" class="btn btn-primary rounded-pill w-100 fw-semibold shadow-sm">Compare Stocks</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="compareResults" class="d-none">
+        <div class="row g-4 mb-4">
+            <div class="col-md-6" id="stock1Card"></div>
+            <div class="col-md-6" id="stock2Card"></div>
+        </div>
+        <div class="card border-0 bg-info-subtle text-info-emphasis rounded-4 shadow-sm premium-card">
+            <div class="card-body p-4 p-md-5">
+                <h5 class="fw-bold tracking-tight mb-4"><i class="fa-solid fa-sparkles text-info me-2"></i> AI Comparison Summary</h5>
+                <div id="aiSummary" class="markdown-body opacity-90 lh-lg">
+                    <div class="spinner-grow spinner-grow-sm text-info" role="status"></div> Analyzing comparison...
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('compareBtn').addEventListener('click', async () => {
+    const s1 = document.getElementById('sym1').value.toUpperCase();
+    const s2 = document.getElementById('sym2').value.toUpperCase();
+    if(!s1 || !s2) return alert('Enter two symbols');
+    
+    document.getElementById('compareResults').classList.remove('d-none');
+    document.getElementById('stock1Card').innerHTML = '<div class="spinner-border text-primary"></div>';
+    document.getElementById('stock2Card').innerHTML = '<div class="spinner-border text-primary"></div>';
+    
+    const fetchStock = async (sym, elemId) => {
+        try {
+            const res = await fetch(`/api/stock/search?q=${sym}`);
+            const data = await res.json();
+            if(data.error) throw new Error(data.error);
+            const html = `
+                <div class="card border-0 shadow-sm rounded-4 premium-card h-100">
+                    <div class="card-body p-4">
+                        <h4 class="fw-bold">${data.name} (${data.symbol})</h4>
+                        <h2 class="display-5 fw-bold mb-0">${data.price} <span class="fs-6 text-muted">${data.currency}</span></h2>
+                        <p class="${data.change >= 0 ? 'text-success' : 'text-danger'} fw-medium">${data.change_percent}%</p>
+                        <ul class="list-group list-group-flush mt-4">
+                            <li class="list-group-item bg-transparent d-flex justify-content-between px-0"><span>Market Cap</span> <strong>${data.market_cap}</strong></li>
+                            <li class="list-group-item bg-transparent d-flex justify-content-between px-0"><span>Volume</span> <strong>${data.volume}</strong></li>
+                        </ul>
+                    </div>
+                </div>`;
+            document.getElementById(elemId).innerHTML = html;
+            return data;
+        } catch(e) {
+            document.getElementById(elemId).innerHTML = `<div class="alert alert-danger border-0">Failed to load ${sym}</div>`;
+            return null;
+        }
+    };
+
+    const [d1, d2] = await Promise.all([fetchStock(s1, 'stock1Card'), fetchStock(s2, 'stock2Card')]);
+    
+    if(d1 && d2) {
+        document.getElementById('aiSummary').innerHTML = '<div class="spinner-grow spinner-grow-sm text-info" role="status"></div> Analyzing comparison...';
+        const query = `Compare ${d1.name} (${d1.symbol}) and ${d2.name} (${d2.symbol}). ${d1.symbol} price: ${d1.price}, ${d2.symbol} price: ${d2.price}. Provide a brief professional comparison of their market position.`;
+        fetch('/api/agent/ask', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')},
+            body: JSON.stringify({query: query, history: []})
+        }).then(res => res.json()).then(data => {
+            const parsed = typeof marked !== 'undefined' ? marked.parse(data.response) : data.response;
+            document.getElementById('aiSummary').innerHTML = parsed;
+        });
+    }
+});
+</script>
+{% endblock %}

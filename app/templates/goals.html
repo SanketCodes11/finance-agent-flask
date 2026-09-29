@@ -1,0 +1,317 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row align-items-center mb-4">
+    <div class="col-md-6">
+        <h2 class="fw-bold tracking-tight mb-1"><i class="fa-solid fa-bullseye text-primary me-2"></i> Financial Goals</h2>
+        <p class="text-muted mb-0">Plan, track, and achieve your financial targets.</p>
+    </div>
+    <div class="col-md-6 text-md-end mt-3 mt-md-0">
+        <button class="btn btn-primary rounded-pill px-4 fw-medium shadow-sm" data-bs-toggle="modal" data-bs-target="#goalModal" onclick="openCreateGoal()">
+            <i class="fa-solid fa-plus me-1"></i> Create Goal
+        </button>
+    </div>
+</div>
+
+<div class="alert alert-info border-info-subtle shadow-sm rounded-4 mb-4 d-flex align-items-center">
+    <i class="fa-solid fa-circle-info fa-lg me-3 text-info"></i>
+    <div>
+        <p class="mb-0 fw-medium small text-dark">Goal calculations are based on simple linear savings and do not assume or guarantee investment returns.</p>
+    </div>
+</div>
+
+<div id="goalsLoading" class="text-center py-5">
+    <div class="spinner-border text-primary" role="status"></div>
+</div>
+<div id="goalsError" class="alert alert-danger d-none"></div>
+
+<div class="row g-4" id="goalsContainer">
+    <!-- Goals will be rendered here -->
+</div>
+
+<!-- Goal Modal (Create/Edit) -->
+<div class="modal fade" id="goalModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-header border-bottom-0 pb-0 pt-4 px-4">
+                <h5 class="modal-title fw-bold" id="goalModalTitle">Create Goal</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div id="goalModalError" class="alert alert-danger d-none small"></div>
+                <form id="goalForm" onsubmit="event.preventDefault(); saveGoal();">
+                    <input type="hidden" id="goalId">
+                    
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Goal Name</label>
+                        <input type="text" class="form-control" id="goalName" required placeholder="e.g., Down Payment, Vacation">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Target Amount</label>
+                        <input type="number" class="form-control" id="targetAmount" required min="1" step="any" placeholder="Total amount needed">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Current Savings (Optional)</label>
+                        <input type="number" class="form-control" id="currentSavings" min="0" step="any" placeholder="Amount already saved">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Target Date</label>
+                        <input type="date" class="form-control" id="targetDate" required>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="form-label text-muted small fw-bold">Planned Monthly Contribution (Optional)</label>
+                        <input type="number" class="form-control" id="monthlyContrib" min="0" step="any" placeholder="How much you plan to save monthly">
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary rounded-pill fw-medium" id="saveGoalBtn">Save Goal</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-body p-4 text-center">
+                <div class="mb-3 text-danger">
+                    <i class="fa-solid fa-triangle-exclamation fa-3x"></i>
+                </div>
+                <h5 class="fw-bold mb-3">Delete Goal?</h5>
+                <p class="text-muted small mb-4">This action cannot be undone.</p>
+                <div class="d-flex gap-2 justify-content-center">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger rounded-pill px-4" id="confirmDeleteBtn">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let goalsData = [];
+    let goalToDelete = null;
+    let goalModalObj = null;
+    let deleteModalObj = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        goalModalObj = new bootstrap.Modal(document.getElementById('goalModal'));
+        deleteModalObj = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+        
+        // Set min date for date picker
+        const today = new Date();
+        today.setDate(today.getDate() + 1);
+        document.getElementById('targetDate').min = today.toISOString().split('T')[0];
+        
+        loadGoals();
+    });
+
+    function formatCurrency(num) {
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(num);
+    }
+
+    function loadGoals() {
+        document.getElementById('goalsLoading').classList.remove('d-none');
+        document.getElementById('goalsError').classList.add('d-none');
+        document.getElementById('goalsContainer').innerHTML = '';
+        
+        fetch('/api/workspace/goals')
+            .then(res => res.json())
+            .then(data => {
+                goalsData = data.goals || [];
+                renderGoals();
+            })
+            .catch(err => {
+                const errElem = document.getElementById('goalsError');
+                errElem.textContent = 'Failed to load goals.';
+                errElem.classList.remove('d-none');
+            })
+            .finally(() => {
+                document.getElementById('goalsLoading').classList.add('d-none');
+            });
+    }
+
+    function renderGoals() {
+        const container = document.getElementById('goalsContainer');
+        if (goalsData.length === 0) {
+            container.innerHTML = `
+                <div class="col-12 text-center py-5">
+                    <div class="text-muted mb-3"><i class="fa-solid fa-bullseye fa-3x text-secondary opacity-50"></i></div>
+                    <h5 class="fw-bold">No goals set yet</h5>
+                    <p class="text-muted">Start planning your financial future by creating a goal.</p>
+                    <button class="btn btn-outline-primary rounded-pill mt-2" data-bs-toggle="modal" data-bs-target="#goalModal" onclick="openCreateGoal()">Create First Goal</button>
+                </div>
+            `;
+            return;
+        }
+        
+        let html = '';
+        goalsData.forEach(g => {
+            const isCompleted = g.is_achieved;
+            const progressColor = isCompleted ? 'bg-success' : 'bg-primary';
+            const statusBadge = isCompleted 
+                ? '<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill">Achieved <i class="fa-solid fa-check ms-1"></i></span>'
+                : `<span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill">${g.months_left} months left</span>`;
+                
+            let insightHtml = '';
+            if (isCompleted) {
+                insightHtml = `<div class="text-success small fw-medium mt-3"><i class="fa-solid fa-trophy me-1"></i> Goal achieved!</div>`;
+            } else {
+                insightHtml = `<div class="text-muted small mt-3">Requires <strong>${formatCurrency(g.required_monthly)}</strong>/mo to reach target on time.</div>`;
+                if (g.monthly_contribution > 0) {
+                    if (g.monthly_contribution >= g.required_monthly) {
+                        insightHtml += `<div class="text-success small fw-medium mt-1"><i class="fa-solid fa-arrow-trend-up me-1"></i> On track to finish early (Est: ${g.est_completion_date})</div>`;
+                    } else {
+                        insightHtml += `<div class="text-warning small fw-medium mt-1"><i class="fa-solid fa-circle-exclamation me-1"></i> Shortfall: Projecting ${formatCurrency(g.projected_amount)} by target date.</div>`;
+                    }
+                }
+            }
+            
+            html += `
+                <div class="col-md-6 col-xl-4">
+                    <div class="card border-0 bg-body rounded-4 shadow-sm h-100 premium-card">
+                        <div class="card-body p-4">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div>
+                                    <h5 class="fw-bold text-body tracking-tight mb-1">${g.name}</h5>
+                                    ${statusBadge}
+                                </div>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-light border rounded-circle text-muted" data-bs-toggle="dropdown"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+                                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                                        <li><a class="dropdown-item" href="#" onclick="openEditGoal(${g.id})"><i class="fa-solid fa-pen text-secondary me-2"></i> Edit</a></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li><a class="dropdown-item text-danger" href="#" onclick="openDeleteGoal(${g.id})"><i class="fa-solid fa-trash me-2"></i> Delete</a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            <h3 class="fw-bold mb-0">${formatCurrency(g.current_savings)}</h3>
+                            <div class="text-muted small fw-medium mb-3">of ${formatCurrency(g.target_amount)}</div>
+                            
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar ${progressColor} rounded-pill" role="progressbar" style="width: ${g.progress_pct}%" aria-valuenow="${g.progress_pct}" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                            <div class="text-end text-muted small fw-bold mt-1">${g.progress_pct}%</div>
+                            
+                            ${insightHtml}
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    }
+
+    function openCreateGoal() {
+        document.getElementById('goalForm').reset();
+        document.getElementById('goalId').value = '';
+        document.getElementById('goalModalTitle').textContent = 'Create Goal';
+        document.getElementById('goalModalError').classList.add('d-none');
+    }
+
+    function openEditGoal(id) {
+        const goal = goalsData.find(g => g.id === id);
+        if(!goal) return;
+        
+        document.getElementById('goalForm').reset();
+        document.getElementById('goalId').value = goal.id;
+        document.getElementById('goalName').value = goal.name;
+        document.getElementById('targetAmount').value = goal.target_amount;
+        document.getElementById('currentSavings').value = goal.current_savings;
+        document.getElementById('targetDate').value = goal.target_date;
+        document.getElementById('monthlyContrib').value = goal.monthly_contribution;
+        
+        document.getElementById('goalModalTitle').textContent = 'Edit Goal';
+        document.getElementById('goalModalError').classList.add('d-none');
+        
+        goalModalObj.show();
+    }
+
+    function saveGoal() {
+        const id = document.getElementById('goalId').value;
+        const btn = document.getElementById('saveGoalBtn');
+        const errElem = document.getElementById('goalModalError');
+        
+        const payload = {
+            name: document.getElementById('goalName').value,
+            target_amount: document.getElementById('targetAmount').value,
+            current_savings: document.getElementById('currentSavings').value || 0,
+            target_date: document.getElementById('targetDate').value,
+            monthly_contribution: document.getElementById('monthlyContrib').value || 0
+        };
+        
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Saving...`;
+        errElem.classList.add('d-none');
+        
+        const url = id ? `/api/workspace/goals/${id}` : '/api/workspace/goals';
+        const method = id ? 'PUT' : 'POST';
+        
+        fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) {
+                goalModalObj.hide();
+                loadGoals();
+            } else {
+                throw new Error(data.error || 'Failed to save goal.');
+            }
+        })
+        .catch(err => {
+            errElem.textContent = err.message;
+            errElem.classList.remove('d-none');
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.textContent = 'Save Goal';
+        });
+    }
+
+    function openDeleteGoal(id) {
+        goalToDelete = id;
+        deleteModalObj.show();
+    }
+
+    document.getElementById('confirmDeleteBtn').addEventListener('click', () => {
+        if(!goalToDelete) return;
+        
+        const btn = document.getElementById('confirmDeleteBtn');
+        btn.disabled = true;
+        
+        fetch(`/api/workspace/goals/${goalToDelete}`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) {
+                deleteModalObj.hide();
+                loadGoals();
+            }
+        })
+        .finally(() => {
+            btn.disabled = false;
+            goalToDelete = null;
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mb-4 align-items-center">
+    <div class="col-md-6">
+        <h2 class="text-body mb-0"><i class="fa-regular fa-newspaper text-primary me-2"></i>Financial News</h2>
+        <p class="text-muted">Latest market updates and headlines.</p>
+    </div>
+    <div class="col-md-6 text-md-end mt-3 mt-md-0">
+        <form class="d-flex search-form" id="newsSearchForm">
+            <div class="input-group input-group-lg shadow-sm rounded-pill bg-body border">
+                
+                    
+                
+                <input type="text" id="newsSearchInput" class="form-control bg-body-tertiary border-0 rounded-pill px-4" placeholder="Search topics, companies, or symbols..." required>
+                <button class="btn btn-primary rounded-pill px-4 m-1 fw-medium" type="submit">Search</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row mb-4 d-none" id="currentQueryContainer">
+    <div class="col-12">
+        <h5 class="text-body">Showing results for: <span id="currentQueryText" class="text-primary"></span></h5>
+    </div>
+</div>
+
+<div id="newsContainer" class="row g-4">
+    <div class="col-12 text-center py-5">
+        <div class="spinner-border text-primary mb-3" role="status"></div>
+        <p class="text-muted">Loading latest news...</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const query = urlParams.get('q') || 'finance';
+        if (query !== 'finance') {
+            document.getElementById('newsSearchInput').value = query;
+        }
+        
+        loadNews(query);
+
+        document.getElementById('newsSearchForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const newQuery = document.getElementById('newsSearchInput').value.trim();
+            if (newQuery) {
+                // Update URL without reloading
+                const url = new URL(window.location);
+                url.searchParams.set('q', newQuery);
+                window.history.pushState({}, '', url);
+                loadNews(newQuery);
+            }
+        });
+    });
+
+    function loadNews(query) {
+        const container = document.getElementById('newsContainer');
+        const queryContainer = document.getElementById('currentQueryContainer');
+        const queryText = document.getElementById('currentQueryText');
+        const searchIcon = document.getElementById('newsSearchIcon');
+        
+        container.innerHTML = `
+            <div class="col-12 text-center py-5">
+                <div class="spinner-border text-primary mb-3" role="status"></div>
+                <p class="text-muted">Fetching articles for "${query}"...</p>
+            </div>
+        `;
+        if(searchIcon) searchIcon.className = 'fa-solid fa-spinner fa-spin text-primary';
+        
+        if (query !== 'finance' && query !== '') {
+            queryContainer.classList.remove('d-none');
+            queryText.textContent = query;
+        } else {
+            queryContainer.classList.add('d-none');
+        }
+
+        fetch(`/api/news?q=${encodeURIComponent(query)}`)
+            .then(async res => {
+                let data;
+                try {
+                    data = await res.json();
+                } catch (e) {
+                    throw { error: 'Network or server error.' };
+                }
+                if (!res.ok) throw data;
+                return data;
+            })
+            .then(data => {
+                if(searchIcon) searchIcon.className = 'fa-solid fa-magnifying-glass';
+                container.innerHTML = '';
+                const articles = data.articles || [];
+                
+                if (articles.length === 0) {
+                    container.innerHTML = `
+                        <div class="col-12 text-center py-5">
+                            <i class="fa-regular fa-folder-open fa-3x text-muted opacity-50 mb-3"></i>
+                            <h5 class="text-body">No articles found</h5>
+                            <p class="text-muted">We couldn't find any news articles matching "${query}". Try a different search term.</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                articles.forEach(article => {
+                    const date = new Date(article.publishedAt).toLocaleString(undefined, {
+                        year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                    });
+                    
+                    const img = article.urlToImage ? `<img src="${article.urlToImage}" class="card-img-top news-img" alt="News Image" onerror="this.src='https://via.placeholder.com/400x200?text=No+Image'">` : `<div class="bg-secondary-subtle d-flex align-items-center justify-content-center news-img"><i class="fa-regular fa-image fa-3x text-muted"></i></div>`;
+                    
+                    const html = `
+                        <div class="col-md-6 col-lg-4 col-xl-3 d-flex align-items-stretch">
+                            <div class="card bg-body border-0 premium-card shadow-sm news-card shadow-sm w-100">
+                                ${img}
+                                <div class="card-body d-flex flex-column">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="badge bg-primary-subtle text-primary text-truncate" style="max-width: 60%;">${article.source}</span>
+                                        <small class="text-muted ms-2 text-end" style="font-size: 0.75rem;">${date}</small>
+                                    </div>
+                                    <h5 class="card-title text-body fs-6 fw-bold mb-3">${article.title}</h5>
+                                    <p class="card-text text-muted small flex-grow-1">${article.description ? article.description.substring(0, 120) + '...' : 'No description available.'}</p>
+                                    <a href="${article.url}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-light text-primary fw-medium border mt-auto">Read Full Article <i class="fa-solid fa-arrow-up-right-from-square ms-1"></i></a>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    container.innerHTML += html;
+                });
+            })
+            .catch(err => {
+                if(searchIcon) searchIcon.className = 'fa-solid fa-magnifying-glass';
+                if (err.not_configured) {
+                    container.innerHTML = `
+                        <div class="col-12">
+                            <div class="alert alert-warning border-warning d-flex align-items-center p-4">
+                                <i class="fa-solid fa-triangle-exclamation fa-3x me-4"></i>
+                                <div>
+                                    <h4 class="alert-heading mb-2">News Service Not Configured</h4>
+                                    <p class="mb-0">The administrator needs to configure the <code>NEWS_API_KEY</code> environment variable to enable financial news searching.</p>
+                                </div>
+                            </div>
+                        </div>`;
+                } else {
+                    container.innerHTML = `
+                        <div class="col-12">
+                            <div class="alert alert-danger border-danger p-4 text-center">
+                                <i class="fa-solid fa-circle-exclamation fa-2x mb-2"></i>
+                                <h5>Failed to load news</h5>
+                                <p class="mb-0">${err.error || 'An unexpected error occurred.'}</p>
+                            </div>
+                        </div>`;
+                }
+            });
+    }
+</script>
+{% endblock %}

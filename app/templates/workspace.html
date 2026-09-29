@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h2 class="fw-bold tracking-tight mb-1"><i class="fa-solid fa-briefcase text-primary me-2"></i> Workspace & Profile</h2>
+        <p class="text-muted mb-0">Manage your preferences, security, and activity history.</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Left Column: Settings and Security -->
+    <div class="col-lg-5">
+        
+        <!-- Preferences -->
+        <div class="card border-0 shadow-sm rounded-4 mb-4 premium-card">
+            <div class="card-header bg-transparent border-bottom py-3">
+                <h6 class="mb-0 fw-bold"><i class="fa-solid fa-gear me-2"></i> Preferences</h6>
+            </div>
+            <div class="card-body p-4">
+                <div id="prefMsg" class="alert d-none small"></div>
+                <form id="prefForm" onsubmit="event.preventDefault(); savePreferences();">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Preferred Currency</label>
+                        <select class="form-select bg-body-tertiary border-0" id="prefCurrency">
+                            <option value="USD">USD ($)</option>
+                            <option value="INR">INR (₹)</option>
+                            <option value="EUR">EUR (€)</option>
+                            <option value="GBP">GBP (£)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="form-label text-muted small fw-bold">Default Theme</label>
+                        <select class="form-select bg-body-tertiary border-0" id="prefTheme">
+                            <option value="auto">System Auto</option>
+                            <option value="light">Light</option>
+                            <option value="dark">Dark</option>
+                        </select>
+                        <div class="form-text small">Note: This will override the quick-toggle until your next login.</div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary rounded-pill px-4 fw-medium" id="savePrefBtn">Save Preferences</button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Security -->
+        <div class="card border-0 shadow-sm rounded-4 premium-card">
+            <div class="card-header bg-transparent border-bottom py-3">
+                <h6 class="mb-0 fw-bold"><i class="fa-solid fa-shield-halved me-2"></i> Security</h6>
+            </div>
+            <div class="card-body p-4">
+                <div id="secMsg" class="alert d-none small"></div>
+                <form id="secForm" onsubmit="event.preventDefault(); changePassword();">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Current Password</label>
+                        <input type="password" class="form-control bg-body-tertiary border-0" id="currentPass" required>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="form-label text-muted small fw-bold">New Password</label>
+                        <input type="password" class="form-control bg-body-tertiary border-0" id="newPass" required minlength="6">
+                    </div>
+                    
+                    <button type="submit" class="btn btn-danger rounded-pill px-4 fw-medium" id="saveSecBtn">Update Password</button>
+                </form>
+            </div>
+        </div>
+        
+    </div>
+    
+    <!-- Right Column: Activity History -->
+    <div class="col-lg-7">
+        
+        <!-- Search History -->
+        <div class="card border-0 shadow-sm rounded-4 mb-4 premium-card">
+            <div class="card-header bg-transparent border-bottom py-3 d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 fw-bold"><i class="fa-solid fa-magnifying-glass me-2"></i> Recent Searches</h6>
+                <button class="btn btn-sm btn-light border text-danger rounded-pill" onclick="clearHistory('search')">Clear All</button>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4">Symbol</th>
+                                <th>Searched At (UTC)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="searchHistoryBody">
+                            <tr><td colspan="2" class="text-center py-4 text-muted small">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Login History -->
+        <div class="card border-0 shadow-sm rounded-4 premium-card">
+            <div class="card-header bg-transparent border-bottom py-3">
+                <h6 class="mb-0 fw-bold"><i class="fa-solid fa-right-to-bracket me-2"></i> Login History</h6>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4">Time (UTC)</th>
+                                <th>IP Address</th>
+                                <th>Device/Browser</th>
+                            </tr>
+                        </thead>
+                        <tbody id="loginHistoryBody">
+                            <tr><td colspan="3" class="text-center py-4 text-muted small">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        loadPreferences();
+        loadHistory('search');
+        loadHistory('login');
+    });
+
+    function loadPreferences() {
+        fetch('/api/workspace/settings')
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('prefCurrency').value = data.preferred_currency || 'USD';
+                document.getElementById('prefTheme').value = data.theme || 'auto';
+            });
+    }
+
+    function savePreferences() {
+        const btn = document.getElementById('savePrefBtn');
+        const msg = document.getElementById('prefMsg');
+        
+        const payload = {
+            preferred_currency: document.getElementById('prefCurrency').value,
+            theme: document.getElementById('prefTheme').value
+        };
+        
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Saving...`;
+        msg.classList.add('d-none');
+        
+        fetch('/api/workspace/settings', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) {
+                msg.textContent = 'Preferences saved successfully.';
+                msg.className = 'alert alert-success small';
+                // Trigger theme change if they changed it
+                const themeBtn = document.querySelector(`[data-bs-theme-value="${payload.theme}"]`);
+                if(themeBtn) themeBtn.click();
+            } else {
+                throw new Error(data.error);
+            }
+        })
+        .catch(err => {
+            msg.textContent = err.message || 'Failed to save.';
+            msg.className = 'alert alert-danger small';
+        })
+        .finally(() => {
+            msg.classList.remove('d-none');
+            btn.disabled = false;
+            btn.textContent = 'Save Preferences';
+        });
+    }
+
+    function changePassword() {
+        const btn = document.getElementById('saveSecBtn');
+        const msg = document.getElementById('secMsg');
+        
+        const payload = {
+            current_password: document.getElementById('currentPass').value,
+            new_password: document.getElementById('newPass').value
+        };
+        
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Updating...`;
+        msg.classList.add('d-none');
+        
+        fetch('/api/workspace/security/password', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) {
+                msg.textContent = 'Password updated successfully.';
+                msg.className = 'alert alert-success small';
+                document.getElementById('secForm').reset();
+            } else {
+                throw new Error(data.error);
+            }
+        })
+        .catch(err => {
+            msg.textContent = err.message || 'Update failed.';
+            msg.className = 'alert alert-danger small';
+        })
+        .finally(() => {
+            msg.classList.remove('d-none');
+            btn.disabled = false;
+            btn.textContent = 'Update Password';
+        });
+    }
+
+    function loadHistory(type) {
+        fetch(`/api/workspace/history/${type}`)
+            .then(res => res.json())
+            .then(data => {
+                const tbody = document.getElementById(`${type}HistoryBody`);
+                const items = data.history || [];
+                
+                if(items.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-muted small">No history found.</td></tr>`;
+                    return;
+                }
+                
+                let html = '';
+                if(type === 'search') {
+                    items.forEach(h => {
+                        html += `
+                            <tr>
+                                <td class="ps-4 fw-bold"><a href="/stock/${h.symbol}" class="text-decoration-none">${h.symbol}</a></td>
+                                <td class="text-muted small">${new Date(h.searched_at).toLocaleString()}</td>
+                            </tr>
+                        `;
+                    });
+                } else {
+                    items.forEach(h => {
+                        const ua = h.user_agent ? (h.user_agent.length > 40 ? h.user_agent.substring(0, 40) + '...' : h.user_agent) : 'Unknown';
+                        html += `
+                            <tr>
+                                <td class="ps-4 text-muted small">${new Date(h.login_time).toLocaleString()}</td>
+                                <td class="small font-monospace">${h.ip_address || 'Unknown'}</td>
+                                <td class="small text-truncate" style="max-width:200px;" title="${h.user_agent}">${ua}</td>
+                            </tr>
+                        `;
+                    });
+                }
+                tbody.innerHTML = html;
+            });
+    }
+
+    function clearHistory(type) {
+        if(!confirm(`Are you sure you want to clear your ${type} history?`)) return;
+        
+        fetch(`/api/workspace/history/${type}`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) {
+                loadHistory(type);
+            }
+        });
+    }
+</script>
+{% endblock %}

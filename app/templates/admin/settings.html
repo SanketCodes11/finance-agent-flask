@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Platform Settings - Admin Control Center{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4 align-items-center">
+        <div class="col">
+            <h2 class="fw-bold mb-0"><i class="fa-solid fa-gears text-primary me-2"></i>Platform Settings</h2>
+            <p class="text-muted mt-1 mb-0">Control global application behavior, maintenance modes, and feature flags.</p>
+        </div>
+        <div class="col-auto">
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline-secondary">
+                <i class="fa-solid fa-arrow-left me-1"></i> Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Sidebar Navigation -->
+        <div class="col-md-3 mb-4">
+            <div class="list-group shadow-sm rounded-3">
+                <a href="{{ url_for('admin.cms') }}" class="list-group-item list-group-item-action fw-medium py-3 text-muted">
+                    <i class="fa-solid fa-house me-2"></i> Homepage Editor
+                </a>
+                <a href="#" class="list-group-item list-group-item-action fw-medium py-3 text-muted disabled">
+                    <i class="fa-solid fa-graduation-cap me-2"></i> Academy & FAQs <span class="badge bg-secondary float-end">Coming Soon</span>
+                </a>
+                <a href="{{ url_for('admin.settings') }}" class="list-group-item list-group-item-action active fw-medium py-3">
+                    <i class="fa-solid fa-gears me-2"></i> Platform Settings
+                </a>
+            </div>
+        </div>
+
+        <!-- Editor Form -->
+        <div class="col-md-9">
+            <div class="card shadow-sm border-0 rounded-3 mb-4">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="card-title fw-bold mb-0">System Toggles</h5>
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST" action="{{ url_for('admin.settings') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        <!-- Maintenance Mode -->
+                        <div class="d-flex justify-content-between align-items-start mb-4 pb-4 border-bottom">
+                            <div>
+                                <h6 class="fw-bold mb-1">
+                                    <i class="fa-solid fa-person-digging text-warning me-2"></i>Maintenance Mode
+                                </h6>
+                                <p class="text-muted small mb-0">
+                                    When enabled, normal users will be blocked from accessing the public application and APIs. 
+                                    They will see a friendly maintenance screen. Authorized admins can still log in and use the platform normally.
+                                </p>
+                            </div>
+                            <div class="form-check form-switch fs-4 ms-3">
+                                <input class="form-check-input" type="checkbox" role="switch" id="maintenance_mode" name="maintenance_mode"
+                                       {% if settings.maintenance_mode %}checked{% endif %}>
+                            </div>
+                        </div>
+
+                        <!-- AI Analyst Mode -->
+                        <div class="d-flex justify-content-between align-items-start mb-4 pb-4 border-bottom">
+                            <div>
+                                <h6 class="fw-bold mb-1">
+                                    <i class="fa-solid fa-robot text-primary me-2"></i>Global AI Analyst
+                                </h6>
+                                <p class="text-muted small mb-0">
+                                    When enabled, users can invoke Gemini-powered insights on stock pages. 
+                                    Disable this if you are encountering prolonged upstream provider outages or budget exhaustion. 
+                                    (Admins bypass this restriction).
+                                </p>
+                            </div>
+                            <div class="form-check form-switch fs-4 ms-3">
+                                <input class="form-check-input" type="checkbox" role="switch" id="ai_analyst_enabled" name="ai_analyst_enabled"
+                                       {% if settings.ai_analyst_enabled %}checked{% endif %}>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center mt-2">
+                            <div class="text-muted small">
+                                <i class="fa-solid fa-shield-halved text-success me-1"></i> Admin actions are audited.
+                            </div>
+                            <button type="submit" class="btn btn-primary px-4 shadow-sm" onclick="return confirm('Save global platform settings?');">
+                                <i class="fa-solid fa-floppy-disk me-2"></i> Save Settings
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            {% if settings.maintenance_mode %}
+            <div class="alert alert-warning shadow-sm border-warning border-opacity-50">
+                <div class="d-flex">
+                    <i class="fa-solid fa-triangle-exclamation fs-4 me-3 mt-1"></i>
+                    <div>
+                        <h6 class="fw-bold mb-1">Maintenance Mode is Active</h6>
+                        <p class="mb-0 small">The public application is currently inaccessible to normal users. Be sure to disable this when maintenance is complete to restore service.</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+        </div>
+    </div>
+</div>
+{% endblock %}

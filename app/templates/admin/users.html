@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}User Management - Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4 align-items-center">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-2">
+                    <li class="breadcrumb-item"><a href="{{ url_for('admin.dashboard') }}" class="text-decoration-none">Dashboard</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Users</li>
+                </ol>
+            </nav>
+            <h2 class="fw-bold"><i class="fa-solid fa-users text-primary me-2"></i>User Management</h2>
+        </div>
+    </div>
+    
+    <div class="card shadow-sm border-0 premium-card mb-4">
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('admin.users') }}" class="d-flex">
+                <div class="input-group">
+                    <span class="input-group-text bg-transparent"><i class="fa-solid fa-search"></i></span>
+                    <input type="text" name="q" class="form-control" placeholder="Search users by username or email..." value="{{ search }}">
+                    <button class="btn btn-primary px-4" type="submit">Search</button>
+                    {% if search %}
+                    <a href="{{ url_for('admin.users') }}" class="btn btn-outline-secondary">Clear</a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="card shadow-sm border-0 premium-card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="px-4 py-3">ID</th>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Joined (UTC)</th>
+                            <th>Last Login</th>
+                            <th>Status</th>
+                            <th>Role</th>
+                            <th class="px-4 text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for u in pagination.items %}
+                        <tr class="{% if not u.is_active %}table-secondary opacity-75{% endif %}">
+                            <td class="px-4 text-muted">#{{ u.id }}</td>
+                            <td class="fw-bold">{{ u.username }}</td>
+                            <td><a href="mailto:{{ u.email }}" class="text-decoration-none">{{ u.email }}</a></td>
+                            <td class="text-muted small">{{ u.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td class="small text-muted">
+                                {% if u.id in last_logins %}
+                                    {{ last_logins[u.id].strftime('%Y-%m-%d %H:%M') }}
+                                {% else %}
+                                    <em>Never</em>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if u.is_active %}
+                                <span class="badge bg-success rounded-pill px-3">Active</span>
+                                {% else %}
+                                <span class="badge bg-danger rounded-pill px-3">Deactivated</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if u.is_admin %}
+                                <span class="badge bg-primary"><i class="fa-solid fa-shield-halved me-1"></i>Admin</span>
+                                {% else %}
+                                <span class="badge bg-secondary">User</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 text-end">
+                                <div class="d-flex justify-content-end gap-2">
+                                    <a href="{{ url_for('admin.user_detail', user_id=u.id) }}" class="btn btn-sm btn-outline-info" title="View 360 Profile">
+                                        <i class="fa-solid fa-eye"></i>
+                                    </a>
+                                    <form method="POST" action="{{ url_for('admin.toggle_active', user_id=u.id) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        {% set is_last_admin = u.is_admin and u.is_active and active_admins_count <= 1 %}
+                                        <button type="submit" class="btn btn-sm btn-outline-{{ 'success' if not u.is_active else 'danger' }}"
+                                                title="{{ 'Activate User' if not u.is_active else 'Deactivate User' }}"
+                                                {% if is_last_admin %}disabled{% endif %}
+                                                onclick="return confirm('Are you sure you want to {{ 'activate' if not u.is_active else 'deactivate' }} {{ u.username }}?');">
+                                            <i class="fa-solid fa-{{ 'user-check' if not u.is_active else 'user-slash' }}"></i>
+                                        </button>
+                                    </form>
+                                    
+                                    <form method="POST" action="{{ url_for('admin.toggle_admin', user_id=u.id) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        {% set is_last_admin = u.is_admin and u.is_active and active_admins_count <= 1 %}
+                                        <button type="submit" class="btn btn-sm btn-outline-{{ 'primary' if not u.is_admin else 'warning' }}"
+                                                title="{{ 'Make Admin' if not u.is_admin else 'Remove Admin' }}"
+                                                {% if is_last_admin %}disabled{% endif %}
+                                                onclick="return confirm('Are you sure you want to {{ 'grant admin rights to' if not u.is_admin else 'revoke admin rights from' }} {{ u.username }}?');">
+                                            <i class="fa-solid fa-{{ 'shield-halved' if not u.is_admin else 'shield' }}"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center py-5 text-muted">
+                                <i class="fa-solid fa-users fa-3x mb-3 text-light"></i>
+                                <h5>No users found</h5>
+                                <p>Try adjusting your search criteria.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Pagination -->
+        {% if pagination.pages > 1 %}
+        <div class="card-footer bg-transparent border-top py-3">
+            <nav aria-label="Users pagination">
+                <ul class="pagination justify-content-center mb-0">
+                    <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                        <a class="page-link" href="{{ url_for('admin.users', page=pagination.prev_num, q=search) }}">Previous</a>
+                    </li>
+                    <li class="page-item disabled">
+                        <span class="page-link">Page {{ pagination.page }} of {{ pagination.pages }}</span>
+                    </li>
+                    <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                        <a class="page-link" href="{{ url_for('admin.users', page=pagination.next_num, q=search) }}">Next</a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

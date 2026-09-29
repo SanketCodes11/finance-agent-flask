@@ -1,0 +1,563 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <div class="row align-items-center mb-4">
+        <div class="col-md-8">
+            <h2 class="fw-bold tracking-tight mb-1"><i class="fa-solid fa-gamepad text-primary me-2"></i> Paper Trading</h2>
+            <p class="text-muted mb-0">Hone your strategies with our real-time simulated exchange.</p>
+        </div>
+        <div class="col-md-4 text-md-end mt-3 mt-md-0">
+            <button class="btn btn-primary rounded-pill px-4 fw-medium shadow-sm" data-bs-toggle="modal" data-bs-target="#tradeModal">
+                <i class="fa-solid fa-plus me-1"></i> New Trade
+            </button>
+        </div>
+    </div>
+
+    <div class="alert alert-info border-info d-flex align-items-center rounded-4 shadow-sm mb-4" role="alert">
+        <i class="fa-solid fa-circle-info fa-2x me-3"></i>
+        <div>
+            <strong>Notice:</strong> This is a simulated trading environment. No real money or actual brokerage orders are involved.
+        </div>
+    </div>
+
+    <!-- Metrics Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm rounded-4 premium-card h-100">
+                <div class="card-body p-4 text-center">
+                    <div class="text-primary bg-primary-subtle rounded-circle d-inline-flex p-3 mb-3">
+                        <i class="fa-solid fa-wallet fa-2x"></i>
+                    </div>
+                    <p class="text-muted mb-1 small fw-medium text-uppercase tracking-wide">Available Cash</p>
+                    <h3 class="fw-bold mb-3" id="cashBalance">Loading...</h3>
+                    <div class="d-flex justify-content-center gap-2">
+                        <button class="btn btn-sm btn-outline-success fw-medium rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#walletModal" onclick="openWalletModal('DEPOSIT')">
+                            <i class="fa-solid fa-arrow-down me-1"></i> Add Funds
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary fw-medium rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#walletModal" onclick="openWalletModal('WITHDRAW')">
+                            <i class="fa-solid fa-arrow-up me-1"></i> Withdraw
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm rounded-4 premium-card h-100">
+                <div class="card-body p-4 text-center">
+                    <div class="text-info bg-info-subtle rounded-circle d-inline-flex p-3 mb-3">
+                        <i class="fa-solid fa-briefcase fa-2x"></i>
+                    </div>
+                    <p class="text-muted mb-1 small fw-medium text-uppercase tracking-wide">Market Value</p>
+                    <h3 class="fw-bold mb-0" id="marketValue">Loading...</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm rounded-4 premium-card h-100">
+                <div class="card-body p-4 text-center">
+                    <div class="text-success bg-success-subtle rounded-circle d-inline-flex p-3 mb-3" id="plIconBox">
+                        <i class="fa-solid fa-arrow-trend-up fa-2x" id="plIcon"></i>
+                    </div>
+                    <p class="text-muted mb-1 small fw-medium text-uppercase tracking-wide">Unrealized P/L</p>
+                    <h3 class="fw-bold mb-0" id="unrealizedPL">Loading...</h3>
+                </div>
+            </div>
+                </div>
+                <div class="tab-pane fade" id="wallet-tx" role="tabpanel">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-4">Date</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                    <th>Amount</th>
+                                    <th class="pe-4 text-end">Resulting Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody id="walletHistoryTableBody">
+                                <tr>
+                                    <td colspan="5" class="text-center py-5 text-muted">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <ul class="nav nav-pills mb-4 gap-2" id="paperTab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active rounded-pill px-4 fw-medium" id="holdings-tab" data-bs-toggle="pill" data-bs-target="#holdings" type="button" role="tab">Open Positions</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-pill px-4 fw-medium" id="history-tab" data-bs-toggle="pill" data-bs-target="#history" type="button" role="tab">Order History</button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="paperTabContent">
+        <!-- Holdings Tab -->
+        <div class="tab-pane fade show active" id="holdings" role="tabpanel">
+            <div class="card border-0 shadow-sm rounded-4 premium-card">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 align-middle">
+                            <thead class="bg-body-tertiary border-bottom">
+                                <tr>
+                                    <th class="ps-4 py-3 text-muted fw-semibold small">Asset</th>
+                                    <th class="py-3 text-muted fw-semibold small">Qty</th>
+                                    <th class="py-3 text-muted fw-semibold small">Avg Price</th>
+                                    <th class="py-3 text-muted fw-semibold small">Current</th>
+                                    <th class="py-3 text-muted fw-semibold small">Market Val</th>
+                                    <th class="py-3 text-muted fw-semibold small">Unrealized P/L</th>
+                                    <th class="pe-4 py-3 text-muted fw-semibold small text-end">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="holdingsTableBody">
+                                <tr>
+                                    <td colspan="7" class="text-center py-5">
+                                        <div class="spinner-border text-primary" role="status"></div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- History Tab -->
+        <div class="tab-pane fade" id="history" role="tabpanel">
+            <div class="card border-0 shadow-sm rounded-4 premium-card">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 align-middle">
+                            <thead class="bg-body-tertiary border-bottom">
+                                <tr>
+                                    <th class="ps-4 py-3 text-muted fw-semibold small">Date</th>
+                                    <th class="py-3 text-muted fw-semibold small">Type</th>
+                                    <th class="py-3 text-muted fw-semibold small">Symbol</th>
+                                    <th class="py-3 text-muted fw-semibold small">Qty</th>
+                                    <th class="py-3 text-muted fw-semibold small">Execution</th>
+                                    <th class="pe-4 py-3 text-muted fw-semibold small text-end">Total Value</th>
+                                </tr>
+                            </thead>
+                            <tbody id="historyTableBody">
+                                <tr>
+                                    <td colspan="6" class="text-center py-5">Loading history...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+                </div>
+                <div class="tab-pane fade" id="wallet-tx" role="tabpanel">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-4">Date</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                    <th>Amount</th>
+                                    <th class="pe-4 text-end">Resulting Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody id="walletHistoryTableBody">
+                                <tr>
+                                    <td colspan="5" class="text-center py-5 text-muted">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- Wallet Modal -->
+<div class="modal fade" id="walletModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header border-bottom-0 bg-light pb-0">
+                <h5 class="modal-title fw-bold" id="walletModalTitle"><i class="fa-solid fa-wallet text-primary me-2"></i>Manage Funds</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 pt-3">
+                <form id="walletForm">
+                    <input type="hidden" id="walletAction">
+                    <div id="walletAlert"></div>
+                    <div class="mb-3 text-center">
+                        <p class="text-muted small mb-2">Available Balance</p>
+                        <h4 class="fw-bold" id="walletCurrentBalance">$0.00</h4>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Amount</label>
+                        <div class="input-group input-group-lg shadow-sm">
+                            <span class="input-group-text bg-white border-end-0 text-muted">$</span>
+                            <input type="number" class="form-control border-start-0" id="walletAmount" min="1" step="0.01" required>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 mb-4">
+                        <button type="button" class="btn btn-outline-secondary flex-grow-1" onclick="document.getElementById('walletAmount').value=10000">+$10k</button>
+                        <button type="button" class="btn btn-outline-secondary flex-grow-1" onclick="document.getElementById('walletAmount').value=50000">+$50k</button>
+                        <button type="button" class="btn btn-outline-secondary flex-grow-1" onclick="document.getElementById('walletAmount').value=100000">+$100k</button>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg rounded-pill fw-medium shadow-sm" id="walletBtn">
+                            <span class="spinner-border spinner-border-sm d-none me-2" id="walletSpinner" role="status" aria-hidden="true"></span>
+                            <span id="walletBtnText">Submit</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+                </div>
+                <div class="tab-pane fade" id="wallet-tx" role="tabpanel">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-4">Date</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                    <th>Amount</th>
+                                    <th class="pe-4 text-end">Resulting Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody id="walletHistoryTableBody">
+                                <tr>
+                                    <td colspan="5" class="text-center py-5 text-muted">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Trade Modal -->
+<div class="modal fade" id="tradeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-bottom border-opacity-10 py-3">
+                <h5 class="modal-title fw-bold">Execute Simulated Trade</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div id="tradeAlert"></div>
+                <form id="tradeForm">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-medium">Order Type</label>
+                        <select class="form-select bg-body-tertiary border-0 rounded-3 px-3 py-2" id="tradeType" required>
+                            <option value="BUY">BUY</option>
+                            <option value="SELL">SELL</option>
+                        </select>
+                    </div>
+                    <div class="mb-3 position-relative">
+                        <label class="form-label text-muted small fw-medium">Symbol</label>
+                        <input type="text" class="form-control text-uppercase bg-body-tertiary border-0 rounded-3 px-3 py-2" id="tradeSymbol" placeholder="AAPL" required autocomplete="off">
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label text-muted small fw-medium">Quantity</label>
+                        <input type="number" step="any" min="0.0001" class="form-control bg-body-tertiary border-0 rounded-3 px-3 py-2" id="tradeQty" required>
+                    </div>
+                    
+                    <div class="d-grid mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg rounded-pill fw-semibold shadow-sm" id="tradeBtn">
+                            <span class="spinner-border spinner-border-sm d-none me-2" id="tradeSpinner"></span>
+                            <span id="tradeBtnText">Execute at Market Price</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+                </div>
+                <div class="tab-pane fade" id="wallet-tx" role="tabpanel">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-4">Date</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                    <th>Amount</th>
+                                    <th class="pe-4 text-end">Resulting Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody id="walletHistoryTableBody">
+                                <tr>
+                                    <td colspan="5" class="text-center py-5 text-muted">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let tradeModal;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        tradeModal = new bootstrap.Modal(document.getElementById('tradeModal'));
+        loadAccount();
+        loadHistory();
+        
+        document.getElementById('tradeForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            executeTrade();
+        });
+
+        document.getElementById('walletForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            executeWalletAction();
+        });
+    });
+
+    function loadAccount() {
+        fetch('/api/paper-trade/account')
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('cashBalance').textContent = '$' + data.current_cash.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                document.getElementById('marketValue').textContent = '$' + data.portfolio_value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                
+                const pl = data.total_value - data.initial_balance;
+                const plElem = document.getElementById('unrealizedPL');
+                const plIconBox = document.getElementById('plIconBox');
+                const plIcon = document.getElementById('plIcon');
+                
+                plElem.textContent = '$' + pl.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                if (pl >= 0) {
+                    plElem.className = 'fw-bold mb-0 text-success';
+                    plIconBox.className = 'text-success bg-success-subtle rounded-circle d-inline-flex p-3 mb-3';
+                    plIcon.className = 'fa-solid fa-arrow-trend-up fa-2x';
+                } else {
+                    plElem.className = 'fw-bold mb-0 text-danger';
+                    plIconBox.className = 'text-danger bg-danger-subtle rounded-circle d-inline-flex p-3 mb-3';
+                    plIcon.className = 'fa-solid fa-arrow-trend-down fa-2x';
+                }
+
+                const tbody = document.getElementById('holdingsTableBody');
+                if (data.holdings.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="7" class="text-center py-5">
+                                <i class="fa-solid fa-folder-open fa-3x text-muted opacity-25 mb-3"></i>
+                                <h5 class="text-body fw-bold">No Open Positions</h5>
+                                <p class="text-muted mb-0">Execute a trade to build your paper portfolio.</p>
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                let html = '';
+                data.holdings.forEach(item => {
+                    const plClass = item.unrealized_pl >= 0 ? 'text-success' : 'text-danger';
+                    const sign = item.unrealized_pl >= 0 ? '+' : '';
+                    html += `
+                        <tr>
+                            <td class="ps-4 fw-bold"><a href="/stock/${item.symbol}" class="text-decoration-none">${item.symbol}</a></td>
+                            <td>${item.quantity.toLocaleString(undefined, {maximumFractionDigits:4})}</td>
+                            <td>$${item.avg_price.toFixed(2)}</td>
+                            <td>$${item.current_price.toFixed(2)}</td>
+                            <td>$${item.market_value.toFixed(2)}</td>
+                            <td class="${plClass} fw-medium">${sign}$${item.unrealized_pl.toFixed(2)} (${sign}${item.return_pct.toFixed(2)}%)</td>
+                            <td class="pe-4 text-end">
+                                <button class="btn btn-sm btn-light border fw-medium px-3 rounded-pill text-primary" onclick="openTradeModal('BUY', '${item.symbol}')">Buy</button>
+                                <button class="btn btn-sm btn-light border fw-medium px-3 rounded-pill text-danger ms-1" onclick="openTradeModal('SELL', '${item.symbol}', ${item.quantity})">Sell</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+                tbody.innerHTML = html;
+            });
+    }
+
+    let walletModal;
+    document.addEventListener('DOMContentLoaded', function() {
+        walletModal = new bootstrap.Modal(document.getElementById('walletModal'));
+    });
+
+    function openWalletModal(action) {
+        document.getElementById('walletAction').value = action;
+        document.getElementById('walletAmount').value = '';
+        document.getElementById('walletAlert').innerHTML = '';
+        document.getElementById('walletBtnText').textContent = action === 'DEPOSIT' ? 'Add Funds' : 'Withdraw Funds';
+        document.getElementById('walletModalTitle').innerHTML = action === 'DEPOSIT' ? '<i class="fa-solid fa-arrow-down text-success me-2"></i>Add Funds' : '<i class="fa-solid fa-arrow-up text-secondary me-2"></i>Withdraw Funds';
+        
+        // Ensure cash balance is up to date
+        const currentCashText = document.getElementById('cashBalance').textContent;
+        document.getElementById('walletCurrentBalance').textContent = currentCashText;
+    }
+
+    function executeWalletAction() {
+        const action = document.getElementById('walletAction').value;
+        const amount = parseFloat(document.getElementById('walletAmount').value);
+        
+        const btn = document.getElementById('walletBtn');
+        const spinner = document.getElementById('walletSpinner');
+        const alertBox = document.getElementById('walletAlert');
+        
+        btn.disabled = true;
+        spinner.classList.remove('d-none');
+        alertBox.innerHTML = '';
+
+        fetch('/api/paper-trade/wallet', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({
+                action: action,
+                amount: amount
+            })
+        })
+        .then(async res => {
+            const data = await res.json();
+            if (!res.ok) throw data;
+            return data;
+        })
+        .then(data => {
+            alertBox.innerHTML = `<div class="alert alert-success border-success text-success px-3 py-2 rounded-3 small fw-medium"><i class="fa-solid fa-check-circle me-1"></i> ${data.message}</div>`;
+            document.getElementById('walletForm').reset();
+            loadAccount();
+            loadWalletHistory();
+            setTimeout(() => walletModal.hide(), 1500);
+        })
+        .catch(err => {
+            alertBox.innerHTML = `<div class="alert alert-danger border-danger text-danger px-3 py-2 rounded-3 small fw-medium"><i class="fa-solid fa-circle-exclamation me-1"></i> ${err.error || 'Failed to process transaction'}</div>`;
+        })
+        .finally(() => {
+            btn.disabled = false;
+            spinner.classList.add('d-none');
+        });
+    }
+
+    function loadWalletHistory() {
+        fetch('/api/paper-trade/wallet/history')
+            .then(res => res.json())
+            .then(data => {
+                const tbody = document.getElementById('walletHistoryTableBody');
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-5 text-muted">No wallet transactions found.</td></tr>';
+                    return;
+                }
+                
+                let html = '';
+                data.forEach(item => {
+                    const date = new Date(item.timestamp).toLocaleString();
+                    const badgeClass = item.type === 'DEPOSIT' ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary';
+                    const sign = item.type === 'DEPOSIT' ? '+' : '-';
+                    html += `
+                        <tr>
+                            <td class="ps-4 text-muted small">${date}</td>
+                            <td><span class="badge ${badgeClass}">${item.type}</span></td>
+                            <td class="text-muted small">${item.description || ''}</td>
+                            <td class="fw-bold ${item.type === 'DEPOSIT' ? 'text-success' : ''}">${sign}$${item.amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            <td class="pe-4 text-end fw-medium">$${item.balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                        </tr>
+                    `;
+                });
+                tbody.innerHTML = html;
+            });
+    }
+
+    function loadHistory() {
+        loadWalletHistory();
+        fetch('/api/paper-trade/history')
+            .then(res => res.json())
+            .then(data => {
+                const tbody = document.getElementById('historyTableBody');
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">No trade history found.</td></tr>';
+                    return;
+                }
+                
+                let html = '';
+                data.forEach(item => {
+                    const date = new Date(item.timestamp).toLocaleString();
+                    const badgeClass = item.order_type === 'BUY' ? 'bg-primary-subtle text-primary' : 'bg-danger-subtle text-danger';
+                    html += `
+                        <tr>
+                            <td class="ps-4 text-muted small">${date}</td>
+                            <td><span class="badge ${badgeClass}">${item.order_type}</span></td>
+                            <td class="fw-bold">${item.symbol}</td>
+                            <td>${item.quantity.toLocaleString(undefined, {maximumFractionDigits:4})}</td>
+                            <td>$${item.execution_price.toFixed(2)}</td>
+                            <td class="pe-4 text-end fw-medium">$${item.transaction_value.toFixed(2)}</td>
+                        </tr>
+                    `;
+                });
+                tbody.innerHTML = html;
+            });
+    }
+
+    function openTradeModal(type, symbol, maxQty = '') {
+        document.getElementById('tradeType').value = type;
+        document.getElementById('tradeSymbol').value = symbol;
+        document.getElementById('tradeQty').value = maxQty;
+        document.getElementById('tradeAlert').innerHTML = '';
+        tradeModal.show();
+    }
+
+    function executeTrade() {
+        const type = document.getElementById('tradeType').value;
+        const symbol = document.getElementById('tradeSymbol').value;
+        const qty = parseFloat(document.getElementById('tradeQty').value);
+        
+        const btn = document.getElementById('tradeBtn');
+        const spinner = document.getElementById('tradeSpinner');
+        const alertBox = document.getElementById('tradeAlert');
+        
+        btn.disabled = true;
+        spinner.classList.remove('d-none');
+        alertBox.innerHTML = '';
+
+        fetch('/api/paper-trade/order', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({
+                symbol: symbol,
+                order_type: type,
+                quantity: qty
+            })
+        })
+        .then(async res => {
+            const data = await res.json();
+            if (!res.ok) throw data;
+            return data;
+        })
+        .then(data => {
+            alertBox.innerHTML = `<div class="alert alert-success border-success text-success px-3 py-2 rounded-3 small fw-medium"><i class="fa-solid fa-check-circle me-1"></i> ${data.message}</div>`;
+            document.getElementById('tradeForm').reset();
+            loadAccount();
+            loadHistory();
+            setTimeout(() => tradeModal.hide(), 1500);
+        })
+        .catch(err => {
+            alertBox.innerHTML = `<div class="alert alert-danger border-danger text-danger px-3 py-2 rounded-3 small fw-medium"><i class="fa-solid fa-circle-exclamation me-1"></i> ${err.error || 'Failed to execute trade'}</div>`;
+        })
+        .finally(() => {
+            btn.disabled = false;
+            spinner.classList.add('d-none');
+        });
+    }
+</script>
+{% endblock %}

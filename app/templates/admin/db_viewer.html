@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Admin - Database Viewer{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2 class="fw-bold"><i class="fa-solid fa-database text-primary me-2"></i>Database Viewer</h2>
+            <p class="text-muted">Read-only view of the local SQLite database. Production access is disabled.</p>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- Tables Sidebar -->
+        <div class="col-md-3 col-lg-2 mb-4">
+            <div class="card shadow-sm border-0 premium-card">
+                <div class="card-header bg-transparent border-bottom py-3">
+                    <h6 class="mb-0 fw-bold">Tables</h6>
+                </div>
+                <div class="list-group list-group-flush">
+                    {% for table in tables %}
+                    <a href="{{ url_for('admin_db.index', table=table) }}" 
+                       class="list-group-item list-group-item-action {% if current_table == table %}active{% endif %}">
+                        <i class="fa-solid fa-table me-2 {% if current_table != table %}text-muted{% endif %}"></i>{{ table }}
+                    </a>
+                    {% else %}
+                    <div class="p-3 text-muted">No tables found.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Table Data -->
+        <div class="col-md-9 col-lg-10">
+            {% if current_table %}
+            <div class="card shadow-sm border-0 premium-card">
+                <div class="card-header bg-transparent border-bottom py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold font-monospace">{{ current_table }}</h5>
+                    <span class="badge bg-primary rounded-pill px-3">{{ total_records }} records</span>
+                </div>
+                
+                <div class="card-body p-4">
+                    <form method="GET" action="{{ url_for('admin_db.index') }}" class="mb-4 d-flex">
+                        <input type="hidden" name="table" value="{{ current_table }}">
+                        <div class="input-group">
+                            <span class="input-group-text bg-transparent"><i class="fa-solid fa-search"></i></span>
+                            <input type="text" name="q" class="form-control" placeholder="Search in all columns..." value="{{ search }}">
+                            <button class="btn btn-primary px-4" type="submit">Search</button>
+                            {% if search %}
+                            <a href="{{ url_for('admin_db.index', table=current_table) }}" class="btn btn-outline-secondary">Clear</a>
+                            {% endif %}
+                        </div>
+                    </form>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped border font-monospace small">
+                            <thead class="table-light">
+                                <tr>
+                                    {% for col in columns %}
+                                    <th scope="col">{{ col }}</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in rows %}
+                                <tr>
+                                    {% for col in columns %}
+                                    <td>{{ row[col] if row[col] is not none else '<em class="text-muted">null</em>'|safe }}</td>
+                                    {% endfor %}
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="{{ columns|length }}" class="text-center py-4 text-muted">
+                                        No records found.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Pagination -->
+                    {% if total_pages > 1 %}
+                    <nav aria-label="Page navigation" class="mt-4">
+                        <ul class="pagination justify-content-center">
+                            <li class="page-item {% if page == 1 %}disabled{% endif %}">
+                                <a class="page-link" href="{{ url_for('admin_db.index', table=current_table, q=search, page=page-1) }}">Previous</a>
+                            </li>
+                            
+                            <li class="page-item disabled">
+                                <span class="page-link">Page {{ page }} of {{ total_pages }}</span>
+                            </li>
+                            
+                            <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+                                <a class="page-link" href="{{ url_for('admin_db.index', table=current_table, q=search, page=page+1) }}">Next</a>
+                            </li>
+                        </ul>
+                    </nav>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

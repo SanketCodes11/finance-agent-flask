@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Super Admin Login - Finance Insight{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-5">
+            <div class="card shadow-lg border-0 rounded-4 overflow-hidden mt-4">
+                <div class="card-header bg-dark text-white py-4 text-center border-0">
+                    <i class="fa-solid fa-shield-halved fa-3x mb-3 text-warning"></i>
+                    <h3 class="mb-0 fw-bold">Super Admin Portal</h3>
+                    <p class="mb-0 text-white-50 small mt-1">Restricted Access Control Center</p>
+                </div>
+                <div class="card-body p-4 p-md-5 bg-light">
+                    <form method="POST" action="{{ url_for('admin.login') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        <div class="mb-4">
+                            <label for="username" class="form-label fw-bold text-muted small text-uppercase">Admin Username</label>
+                            <div class="input-group input-group-lg shadow-sm">
+                                <span class="input-group-text bg-white border-end-0 text-muted"><i class="fa-solid fa-user-shield"></i></span>
+                                <input type="text" class="form-control border-start-0 ps-0" id="username" name="username" required autofocus placeholder="Enter admin username">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="password" class="form-label fw-bold text-muted small text-uppercase">Passcode</label>
+                            <div class="input-group input-group-lg shadow-sm">
+                                <span class="input-group-text bg-white border-end-0 text-muted"><i class="fa-solid fa-lock"></i></span>
+                                <input type="password" class="form-control border-start-0 ps-0" id="password" name="password" required placeholder="Enter secure passcode">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4 form-check">
+                            <input type="checkbox" class="form-check-input" id="remember_me" name="remember_me">
+                            <label class="form-check-label text-muted small" for="remember_me">Keep admin session active</label>
+                        </div>
+                        
+                        <div class="d-grid mt-5">
+                            <button type="submit" class="btn btn-dark btn-lg fw-bold shadow-sm rounded-3">
+                                <i class="fa-solid fa-right-to-bracket me-2"></i> Authorize Entry
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer bg-white border-0 py-3 text-center">
+                    <a href="{{ url_for('auth.login') }}" class="text-muted small text-decoration-none">
+                        <i class="fa-solid fa-arrow-left me-1"></i> Return to standard login
+                    </a>
+                </div>
+            </div>
+            
+            <div class="text-center mt-4 text-muted small" style="opacity: 0.7;">
+                <i class="fa-solid fa-lock me-1"></i> Finance Insight Secure Infrastructure
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
