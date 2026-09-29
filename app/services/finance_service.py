@@ -1,7 +1,19 @@
 import os
 # Fix Vercel read-only filesystem issue for yfinance
 os.environ["YFINANCE_CACHE_DIR"] = "/tmp/yf_cache"
+
+import requests
 import yfinance as yf
+
+# Global session to bypass Vercel IP blocks
+yf_session = requests.Session()
+yf_session.headers.update({
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
+    'Accept': '*/*',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Connection': 'keep-alive'
+})
+
 try:
     yf.set_tz_cache_location("/tmp/yf_tz")
 except Exception:
@@ -44,7 +56,7 @@ def _fetch_yahoo_quote(symbol):
         raise ValueError("Market data currently unavailable (Yahoo rate limited).")
         
     try:
-        ticker = yf.Ticker(symbol)
+        ticker = yf.Ticker(symbol, session=yf_session)
         
         try:
             info = ticker.info
@@ -55,357 +67,23 @@ def _fetch_yahoo_quote(symbol):
         
         hist = ticker.history(period="5d")
         if hist.empty:
-            raise ValueError("No price data available for this symbol.")
+            errors = []
             
-        current_price = hist['Close'].iloc[-1]
-        previous_close = hist['Close'].iloc[-2] if len(hist) > 1 else current_price
-        
-        change = current_price - previous_close
-        change_percent = (change / previous_close) * 100 if previous_close else 0
-        
-        currency = info.get('currency', fast_info.get('currency', 'USD'))
-        
-        inr_price = None
-        if currency and currency.upper() != 'INR':
             try:
-                forex_ticker = yf.Ticker(f"{currency.upper()}INR=X")
-                fx_rate = getattr(forex_ticker, 'fast_info', {}).get('lastPrice')
-                if not fx_rate:
-                    fx_hist = forex_ticker.history(period="1d")
-                    if not fx_hist.empty:
-                        fx_rate = fx_hist['Close'].iloc[-1]
-                if fx_rate:
-                    inr_price = round(float(current_price * fx_rate), 2)
-            except Exception:
-                pass
+                return _fetch_yahoo_history_raw(symbol, period, interval)
+            except Exception as e:
+                errors.append(f"Yahoo Raw: {str(e)}")
                 
-        exchange = info.get('exchange') or fast_info.get('exchange', 'Unknown Exchange')
-        if exchange in ['BSE', 'BSI']:
-            exchange = 'BSE (Bombay Stock Exchange)'
-        elif exchange in ['NSE', 'NSI']:
-            exchange = 'NSE (National Stock Exchange)'
-            
-        return {
-            'symbol': symbol,
-            'name': info.get('longName', info.get('shortName', symbol)),
-            'price': round(float(current_price), 2),
-            'currency': currency,
-            'inr_price': inr_price,
-            'exchange': exchange,
-            'country': info.get('country', 'Unknown'),
-            'change': round(float(change), 2),
-            'change_percent': round(float(change_percent), 2),
-            'previous_close': round(float(previous_close), 2),
-            'open': round(float(hist['Open'].iloc[-1]), 2),
-            'day_high': round(float(hist['High'].iloc[-1]), 2),
-            'day_low': round(float(hist['Low'].iloc[-1]), 2),
-            'fiftyTwoWeekHigh': info.get('fiftyTwoWeekHigh', fast_info.get('yearHigh')),
-            'fiftyTwoWeekLow': info.get('fiftyTwoWeekLow', fast_info.get('yearLow')),
-            'volume': int(hist['Volume'].iloc[-1]),
-            'market_cap': info.get('marketCap', fast_info.get('marketCap', 0)),
-            'description': info.get('longBusinessSummary', 'Description unavailable.'),
-            'provider': 'Yahoo Finance',
-            'last_updated': int(time.time())
-        }
-    except Exception as e:
-        err_msg = str(e).lower()
-        if '429' in err_msg or 'too many requests' in err_msg:
-            _trip_yahoo_circuit()
-            raise ValueError("Market data currently unavailable (Yahoo rate limited).")
-        raise ValueError(f"Failed to fetch data for {symbol}: {str(e)}")
-
-def _fetch_twelvedata_quote(symbol, api_key):
-    norm = symbol.upper().strip()
-    exchange_param = ""
-    twelve_sym = norm
-    if norm.endswith(".NS"):
-        twelve_sym = norm[:-3]
-        exchange_param = "&exchange=NSE"
-    elif norm.endswith(".BO"):
-        twelve_sym = norm[:-3]
-        exchange_param = "&exchange=BSE"
-        
-    url = f"https://api.twelvedata.com/quote?symbol={twelve_sym}{exchange_param}&apikey={api_key}"
-    resp = requests.get(url, timeout=5)
-    resp.raise_for_status()
-    data = resp.json()
-    
-    if data.get('status') == 'error':
-        if data.get('code') == 429:
-            raise Exception("429_TWELVEDATA")
-        raise ValueError(data.get('message', 'Twelve Data API Error'))
-        
-    current_price = float(data.get('close') or 0.0)
-    previous_close = float(data.get('previous_close') or current_price)
-    change = float(data.get('change') or 0.0)
-    change_percent = float(data.get('percent_change') or 0.0)
-    
-    currency = data.get('currency', 'USD')
-    
-    inr_price = None
-    if currency and currency.upper() != 'INR':
-        try:
-            # Fallback to yahoo for forex only, or Twelve Data price
-            fx_url = f"https://api.twelvedata.com/price?symbol={currency.upper()}/INR&apikey={api_key}"
-            fx_resp = requests.get(fx_url, timeout=3).json()
-            if 'price' in fx_resp:
-                inr_price = round(current_price * float(fx_resp['price']), 2)
-        except Exception:
-            pass
-            
-    exchange_str = data.get('exchange', 'Unknown')
-    if 'NSE' in exchange_str.upper():
-        exchange_str = 'NSE (National Stock Exchange)'
-    elif 'BSE' in exchange_str.upper():
-        exchange_str = 'BSE (Bombay Stock Exchange)'
-        
-    ft_week = data.get('fifty_two_week', {})
-    
-    return {
-        'symbol': symbol,
-        'name': data.get('name') or symbol,
-        'price': round(current_price, 2),
-        'currency': currency,
-        'inr_price': inr_price,
-        'exchange': exchange_str,
-        'country': 'Unknown',
-        'change': round(change, 2),
-        'change_percent': round(change_percent, 2),
-        'previous_close': round(previous_close, 2),
-        'open': round(float(data.get('open') or 0.0), 2),
-        'day_high': round(float(data.get('high') or 0.0), 2),
-        'day_low': round(float(data.get('low') or 0.0), 2),
-        'fiftyTwoWeekHigh': float(ft_week.get('high') or 0.0) if ft_week.get('high') else None,
-        'fiftyTwoWeekLow': float(ft_week.get('low') or 0.0) if ft_week.get('low') else None,
-        'volume': int(data.get('volume') or 0),
-        'market_cap': 0,
-        'description': 'Description unavailable via standard tier.',
-        'provider': 'Twelve Data',
-        'last_updated': int(data.get('timestamp') or time.time())
-    }
-
-def get_stock_quote(symbol):
-    if not symbol:
-        raise ValueError("Symbol is required")
-        
-    normalized_symbol = symbol.upper().strip()
-    current_time = time.time()
-    
-    with QUOTE_CACHE_LOCK:
-        if normalized_symbol in QUOTE_CACHE:
-            data, timestamp = QUOTE_CACHE[normalized_symbol]
-            if current_time - timestamp < QUOTE_CACHE_TTL:
-                return data
-
-    api_key = current_app.config.get('TWELVE_DATA_API_KEY')
-    result = None
-    
-    if api_key and api_key != 'your-twelvedata-api-key-here':
-        try:
-            result = _fetch_twelvedata_quote(symbol, api_key)
-        except Exception as e:
-            err_str = str(e)
-            if '429_TWELVEDATA' in err_str or '429' in err_str:
-                current_app.logger.warning("TwelveData 429 rate limit hit.")
-            else:
-                current_app.logger.error(f"TwelveData fetch error for {symbol}: {err_str}")
-            result = None
-            
-
-    if not result:
-        try:
-            result = _fetch_yahoo_quote(symbol)
-        except Exception:
-            result = None
-
-    if not result and '.' not in normalized_symbol:
-        # If both providers failed and it's a generic symbol, it might be an Indian/international stock missing its suffix.
-        # Let's search for it and use the top result's exact symbol.
-        search_res = search_stocks(normalized_symbol)
-        if search_res and search_res[0].get('symbol') != normalized_symbol:
-            best_match = search_res[0].get('symbol')
-            # Try fetching with the corrected symbol
-            if api_key and api_key != 'your-twelvedata-api-key-here':
-                try:
-                    result = _fetch_twelvedata_quote(best_match, api_key)
-                except Exception:
-                    pass
-            if not result:
-                result = _fetch_yahoo_quote(best_match)
-                
-    if not result:
-        raise ValueError("Market data currently unavailable. Could not fetch current live data.")
-        
-    with QUOTE_CACHE_LOCK:
-        QUOTE_CACHE[normalized_symbol] = (result, time.time())
-        
-    return result
-
-def get_multiple_stock_quotes(symbols):
-    if not symbols:
-        return {}
-    
-    results = {}
-    import concurrent.futures
-    
-    unique_requests = {}
-    for sym in symbols:
-        if not sym: continue
-        norm = sym.upper().strip()
-        if norm not in unique_requests:
-            unique_requests[norm] = []
-        unique_requests[norm].append(sym)
-        
-    symbols_to_fetch = []
-    current_time = time.time()
-    
-    with QUOTE_CACHE_LOCK:
-        for norm, orig_list in unique_requests.items():
-            if norm in QUOTE_CACHE:
-                data, timestamp = QUOTE_CACHE[norm]
-                if current_time - timestamp < QUOTE_CACHE_TTL:
-                    for orig_sym in orig_list:
-                        results[orig_sym] = data
-                else:
-                    symbols_to_fetch.append(norm)
-            else:
-                symbols_to_fetch.append(norm)
-                
-    if not symbols_to_fetch:
-        return results
-        
-    from flask import current_app
-    app_obj = current_app._get_current_object()
-        
-    def fetch_single(norm_sym):
-        with app_obj.app_context():
-            try:
-                return norm_sym, get_stock_quote(norm_sym)
-            except:
-                return norm_sym, None
-            
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-        future_to_sym = {executor.submit(fetch_single, norm): norm for norm in symbols_to_fetch}
-        for future in concurrent.futures.as_completed(future_to_sym):
-            norm_sym, data = future.result()
-            if data:
-                for orig_sym in unique_requests[norm_sym]:
-                    results[orig_sym] = data
-                
-    return results
-
-
-def _fetch_twelvedata_history(symbol, period, interval_yd, api_key):
-    from datetime import datetime
-    interval_map = {'5m': '5min', '15m': '15min', '1d': '1day', '1wk': '1week'}
-    td_interval = interval_map.get(interval_yd, '1day')
-    
-    size_map = {'1d': 78, '5d': 130, '1w': 130, '1mo': 22, '3mo': 65, '6mo': 130, '1y': 252, '5y': 260, 'max': 500}
-    outputsize = size_map.get(period, 30)
-
-    td_sym = symbol
-    exchange_param = ""
-    if symbol.endswith('.NS'):
-        td_sym = symbol[:-3]
-        exchange_param = "&exchange=NSE"
-    elif symbol.endswith('.BO'):
-        td_sym = symbol[:-3]
-        exchange_param = "&exchange=BSE"
-
-    url = f"https://api.twelvedata.com/time_series?symbol={td_sym}{exchange_param}&interval={td_interval}&outputsize={outputsize}&apikey={api_key}"
-    
-    import requests
-    response = requests.get(url, timeout=5)
-    response.raise_for_status()
-    data = response.json()
-    
-    if data.get('status') == 'error':
-        err = data.get('message', '')
-        if 'You have reached' in err or 'Rate limit' in err:
-            raise Exception("429_TWELVEDATA")
-        raise ValueError(f"TwelveData Error: {err}")
-        
-    values = data.get('values', [])
-    if not values:
-        raise ValueError("No historical data found from TwelveData.")
-        
-    values.reverse() # Newest first -> Oldest first for charts
-    
-    labels, timestamps, opens, highs, lows, closes, volumes = [], [], [], [], [], [], []
-    
-    for v in values:
-        dt_str = v.get('datetime')
-        try:
-            if len(dt_str) > 10:
-                dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
-            else:
-                dt = datetime.strptime(dt_str, "%Y-%m-%d")
-        except:
-            continue
-            
-        labels.append(dt.strftime('%Y-%m-%d'))
-        timestamps.append(int(dt.timestamp()))
-        opens.append(round(float(v.get('open', 0)), 2))
-        highs.append(round(float(v.get('high', 0)), 2))
-        lows.append(round(float(v.get('low', 0)), 2))
-        closes.append(round(float(v.get('close', 0)), 2))
-        volumes.append(int(v.get('volume', 0)))
-        
-    return {
-        'labels': labels,
-        'prices': closes,
-        'timestamps': timestamps,
-        'open': opens,
-        'high': highs,
-        'low': lows,
-        'close': closes,
-        'volume': volumes
-    }
-
-def get_stock_history(symbol, period='1mo'):
-    if not _check_yahoo_circuit():
-        raise ValueError("Market history currently unavailable (Yahoo rate limited).")
-        
-    valid_periods = ['1d', '5d', '1w', '1mo', '3mo', '6mo', '1y', '5y', 'max']
-    if period not in valid_periods:
-        period = '1mo'
-        
-    interval = '1d'
-    if period == '1d':
-        interval = '5m'
-    elif period == '1w' or period == '5d':
-        period = '5d'
-        interval = '15m'
-    elif period in ['5y', 'max']:
-        interval = '1wk'
-        
-    try:
-        ticker = yf.Ticker(symbol)
-        hist = ticker.history(period=period, interval=interval)
-        
-        # If empty and symbol has no suffix, try searching for the correct suffix
-        if hist.empty and '.' not in symbol:
-            search_res = search_stocks(symbol)
-            if search_res and search_res[0].get('symbol') != symbol:
-                best_match = search_res[0].get('symbol')
-                ticker = yf.Ticker(best_match)
-                hist = ticker.history(period=period, interval=interval)
-
-        # Ensure we don't send NaN values which break JSON and Lightweight Charts
-        hist = hist.dropna(subset=['Open', 'High', 'Low', 'Close', 'Volume'])
-        # Ensure timestamps are strictly unique and ascending (required by Lightweight Charts)
-        hist = hist[~hist.index.duplicated(keep='first')]
-        hist = hist.sort_index()
-        
-        
-        if hist.empty:
             api_key = current_app.config.get('TWELVE_DATA_API_KEY')
             if api_key and api_key != 'your-twelvedata-api-key-here':
                 try:
                     return _fetch_twelvedata_history(symbol, period, interval, api_key)
                 except Exception as e:
-                    current_app.logger.warning(f"TwelveData history fallback failed: {e}")
-            raise ValueError("No historical data found.")
+                    errors.append(f"TwelveData: {str(e)}")
+            else:
+                errors.append("TwelveData API Key missing.")
+                
+            raise ValueError(f"No historical data found. Details: {' | '.join(errors)}")
 
             
         labels = [date.strftime('%Y-%m-%d') for date in hist.index]
