@@ -12,9 +12,11 @@ class Config:
         SECRET_KEY = 'dev-fallback-secret-key-12345'
         
     db_url = os.environ.get('DATABASE_URL')
-    if db_url and db_url.startswith("postgres://"):
-        # SQLAlchemy 1.4+ removed support for the `postgres://` URI scheme, using `postgresql://` instead
-        db_url = db_url.replace("postgres://", "postgresql://", 1)
+    if db_url:
+        if db_url.startswith("postgres://"):
+            db_url = db_url.replace("postgres://", "postgresql+psycopg2://", 1)
+        elif db_url.startswith("postgresql://"):
+            db_url = db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
         
     SQLALCHEMY_DATABASE_URI = db_url or 'sqlite:///' + os.path.join(basedir, 'finance.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
