@@ -203,8 +203,30 @@ def get_stock_quote(symbol):
                 current_app.logger.error(f"TwelveData fetch error for {symbol}: {err_str}")
             result = None
             
+
     if not result:
-        result = _fetch_yahoo_quote(symbol)
+        try:
+            result = _fetch_yahoo_quote(symbol)
+        except Exception:
+            result = None
+
+    if not result and '.' not in normalized_symbol:
+        # If both providers failed and it's a generic symbol, it might be an Indian/international stock missing its suffix.
+        # Let's search for it and use the top result's exact symbol.
+        search_res = search_stocks(normalized_symbol)
+        if search_res and search_res[0].get('symbol') != normalized_symbol:
+            best_match = search_res[0].get('symbol')
+            # Try fetching with the corrected symbol
+            if api_key and api_key != 'your-twelvedata-api-key-here':
+                try:
+                    result = _fetch_twelvedata_quote(best_match, api_key)
+                except Exception:
+                    pass
+            if not result:
+                result = _fetch_yahoo_quote(best_match)
+                
+    if not result:
+        raise ValueError("Market data currently unavailable. Could not fetch current live data.")
         
     with QUOTE_CACHE_LOCK:
         QUOTE_CACHE[normalized_symbol] = (result, time.time())
@@ -244,11 +266,15 @@ def get_multiple_stock_quotes(symbols):
     if not symbols_to_fetch:
         return results
         
+    from flask import current_app
+    app_obj = current_app._get_current_object()
+        
     def fetch_single(norm_sym):
-        try:
-            return norm_sym, get_stock_quote(norm_sym)
-        except:
-            return norm_sym, None
+        with app_obj.app_context():
+            try:
+                return norm_sym, get_stock_quote(norm_sym)
+            except:
+                return norm_sym, None
             
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         future_to_sym = {executor.submit(fetch_single, norm): norm for norm in symbols_to_fetch}
@@ -281,6 +307,14 @@ def get_stock_history(symbol, period='1mo'):
         ticker = yf.Ticker(symbol)
         hist = ticker.history(period=period, interval=interval)
         
+        # If empty and symbol has no suffix, try searching for the correct suffix
+        if hist.empty and '.' not in symbol:
+            search_res = search_stocks(symbol)
+            if search_res and search_res[0].get('symbol') != symbol:
+                best_match = search_res[0].get('symbol')
+                ticker = yf.Ticker(best_match)
+                hist = ticker.history(period=period, interval=interval)
+
         # Ensure we don't send NaN values which break JSON and Lightweight Charts
         hist = hist.dropna(subset=['Open', 'High', 'Low', 'Close', 'Volume'])
         # Ensure timestamps are strictly unique and ascending (required by Lightweight Charts)

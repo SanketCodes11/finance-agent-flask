@@ -110,7 +110,7 @@
                         year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
                     });
                     
-                    const img = article.urlToImage ? `<img src="${article.urlToImage}" class="card-img-top news-img" alt="News Image" onerror="this.src='https://via.placeholder.com/400x200?text=No+Image'">` : `<div class="bg-secondary-subtle d-flex align-items-center justify-content-center news-img"><i class="fa-regular fa-image fa-3x text-muted"></i></div>`;
+                    const img = article.urlToImage ? `<img src="${article.urlToImage}" class="card-img-top news-img" alt="News Image" onerror="this.outerHTML='<div class=&quot;bg-secondary-subtle d-flex align-items-center justify-content-center news-img&quot;><i class=&quot;fa-regular fa-image fa-3x text-muted&quot;></i></div>'">` : `<div class="bg-secondary-subtle d-flex align-items-center justify-content-center news-img"><i class="fa-regular fa-image fa-3x text-muted"></i></div>`;
                     
                     const html = `
                         <div class="col-md-6 col-lg-4 col-xl-3 d-flex align-items-stretch">

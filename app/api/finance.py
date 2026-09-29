@@ -66,7 +66,8 @@ def stock_history():
 @bp.route('/market_indices', methods=['GET'])
 @login_required
 def market_indices():
-    symbols = ['^GSPC', '^NSEI', '^DJI', '^IXIC']
+    # Use highly reliable ETF symbols instead of Yahoo-specific index symbols to ensure compatibility with TwelveData
+    symbols = ['SPY', 'QQQ', 'DIA']
     try:
         from app.services.finance_service import get_multiple_stock_quotes
         quotes = get_multiple_stock_quotes(symbols)
@@ -75,10 +76,9 @@ def market_indices():
             if sym in quotes:
                 # Rename the symbols for better UI display
                 name = quotes[sym].get('name')
-                if sym == '^GSPC': name = 'S&P 500'
-                elif sym == '^NSEI': name = 'NIFTY 50'
-                elif sym == '^DJI': name = 'Dow Jones'
-                elif sym == '^IXIC': name = 'NASDAQ'
+                if sym == 'SPY': name = 'S&P 500 (SPY)'
+                elif sym == 'QQQ': name = 'NASDAQ (QQQ)'
+                elif sym == 'DIA': name = 'Dow Jones (DIA)'
                 
                 result.append({
                     'symbol': sym,

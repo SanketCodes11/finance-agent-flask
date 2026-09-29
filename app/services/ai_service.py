@@ -57,7 +57,7 @@ def fetch_agent_insight(query: str, history: list = None) -> str:
         raise Exception("AI Analysis Unavailable: The AI service is currently not configured. The administrator needs to configure the GEMINI_API_KEY environment variable.")
 
     client = genai.Client(api_key=api_key)
-    model_name = "gemini-3.8-flash"
+    model_name = "gemini-3.5-flash"
     
     config = types.GenerateContentConfig(
         tools=[search_company_symbol, lookup_stock_price, search_news],

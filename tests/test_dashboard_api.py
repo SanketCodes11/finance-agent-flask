@@ -31,13 +31,14 @@ from unittest.mock import patch
 @patch('app.services.finance_service.get_multiple_stock_quotes')
 def test_market_indices(mock_multiple, auth_client):
     mock_multiple.return_value = {
-        '^GSPC': {'symbol': '^GSPC', 'price': 5000.0, 'name': 'S&P 500'}
+        'SPY': {'symbol': 'SPY', 'price': 500.0, 'name': 'S&P 500 (SPY)'}
     }
     res = auth_client.get('/api/market_indices')
     assert res.status_code == 200
     data = res.get_json()
     assert isinstance(data, list)
     assert len(data) > 0
-    # verify S&P 500 is in there
+    assert data[0]['symbol'] == 'SPY'
+    # verify SPY is in there
     symbols = [item['symbol'] for item in data]
-    assert '^GSPC' in symbols
+    assert 'SPY' in symbols

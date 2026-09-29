@@ -75,6 +75,22 @@
         </div>
     </div>
 
+
+    <!-- AI Analyst Section -->
+    <div class="d-flex justify-content-between align-items-center mb-4 mt-5 gap-3">
+        <h5 class="fw-bold tracking-tight mb-0"><i class="fa-solid fa-sparkles text-warning me-2"></i>AI Market Analyst</h5>
+    </div>
+    <div class="card border-0 bg-dark text-white rounded-4 shadow-sm premium-card overflow-hidden mb-5">
+        <div class="card-body p-4 p-md-5">
+            <div class="input-group mb-4 shadow-sm">
+                <input type="text" id="dashboardAiInput" class="form-control form-control-lg bg-white bg-opacity-10 text-white border-secondary border-opacity-25 placeholder-white-50" placeholder="Ask about market conditions, sectors, or specific stocks..." autocomplete="off">
+                <button class="btn btn-warning px-4 fw-bold" type="button" onclick="askDashboardAI()"><i class="fa-solid fa-paper-plane me-2"></i>Ask Agent</button>
+            </div>
+            <div id="dashboardAiAnalysisContainer" class="markdown-body text-white opacity-90 lh-lg d-none p-3 bg-black bg-opacity-25 rounded-3">
+            </div>
+        </div>
+    </div>
+
     <!-- News Section -->
     <h5 class="fw-bold tracking-tight mb-4"><i class="fa-regular fa-newspaper text-primary me-2"></i>Market News</h5>
     <div class="row g-4" id="newsContainer">
@@ -138,6 +154,50 @@
     
     searchInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') performSearch(); });
 
+
+    function askDashboardAI() {
+        const input = document.getElementById('dashboardAiInput');
+        const container = document.getElementById('dashboardAiAnalysisContainer');
+        const query = input.value.trim();
+        
+        if (!query) return;
+        
+        container.classList.remove('d-none');
+        container.innerHTML = '<div class="text-white-50"><i class="fa-solid fa-circle-notch fa-spin me-2"></i> Generating analysis...</div>';
+        
+        fetch('/api/agent/ask', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content') },
+            body: JSON.stringify({ query: query, history: [] })
+        }).then(res => res.json()).then(data => {
+            if (data.error) {
+                container.innerHTML = `<div class="text-warning mb-2"><i class="fa-solid fa-triangle-exclamation me-2"></i> ${data.error}</div>`;
+            } else {
+                let aiText = data.response || data.answer || data.message || data.content || '';
+                if (!aiText) {
+                    container.innerHTML = `<div class="text-warning mb-2"><i class="fa-solid fa-triangle-exclamation me-2"></i> AI generated an empty response.</div>`;
+                    return;
+                }
+                const parsedMarkdown = typeof marked !== 'undefined' ? marked.parse(aiText) : aiText.replace(/\n/g, '<br>');
+                container.innerHTML = parsedMarkdown;
+            }
+        }).catch(err => {
+            container.innerHTML = `<div class="text-danger mb-2"><i class="fa-solid fa-circle-exclamation me-2"></i> AI Analysis is temporarily unavailable. Please try again.</div>`;
+        });
+    }
+
+    // Allow Enter key to submit
+    document.addEventListener('DOMContentLoaded', () => {
+        const aiInput = document.getElementById('dashboardAiInput');
+        if (aiInput) {
+            aiInput.addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') {
+                    askDashboardAI();
+                }
+            });
+        }
+    });
+
     function loadPortfolioSummary() {
         fetch('/api/portfolio').then(res => res.json()).then(data => {
             let totalVal = 0, totalCost = 0;
@@ -168,6 +228,10 @@
         const container = document.getElementById('marketMoversContainer');
         fetch('/api/market_indices').then(res => res.json()).then(data => {
             container.innerHTML = '';
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div class="text-muted small">Market data temporarily unavailable.</div>';
+                return;
+            }
             data.forEach(item => {
                 const isPos = item.change >= 0;
                 const color = isPos ? 'text-success' : 'text-danger';
@@ -201,7 +265,18 @@
             data.slice(0, 5).forEach(item => {
                 const tr = document.createElement('tr');
                 if (item.error) {
-                    tr.innerHTML = `<td class="ps-4 fw-bold"><a href="/stock/${item.symbol}" class="text-body text-decoration-none">${item.symbol}</a></td><td colspan="2" class="text-danger small">${item.error}</td><td class="text-end pe-4"><button class="btn btn-sm btn-light text-danger rounded-circle border-0" onclick="removeFromWatchlist('${item.symbol}')"><i class="fa-solid fa-trash"></i></button></td>`;
+                    tr.innerHTML = `
+                        <td class="ps-4">
+                            <a href="/stock/${item.symbol}" class="text-body text-decoration-none hover-primary fw-bold">${item.symbol}</a>
+                            <div class="small text-muted text-truncate" style="max-width: 150px;">${item.name || item.symbol}</div>
+                        </td>
+                        <td colspan="2" class="text-muted small align-middle">
+                            <i class="fa-solid fa-circle-exclamation text-warning me-1"></i> Live price unavailable
+                        </td>
+                        <td class="text-end pe-4 align-middle">
+                            <button class="btn btn-sm btn-light text-danger rounded-circle border-0" onclick="removeFromWatchlist('${item.symbol}')"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    `;
                 } else {
                     const isPos = item.change >= 0;
                     const sign = isPos ? '+' : '';
@@ -244,12 +319,12 @@
             container.innerHTML = '';
             const articles = data.articles || [];
             if (articles.length === 0) {
-                container.innerHTML = '<div class="col-12"><div class="card bg-body text-center py-5 border-0 rounded-4 shadow-sm text-muted">No news available at the moment.</div></div>'; return;
+                container.innerHTML = '<div class="col-12"><div class="card bg-body text-center py-5 border-0 rounded-4 shadow-sm text-muted"><i class="fa-solid fa-newspaper fa-2x mb-3 text-secondary opacity-50"></i><br>Live news temporarily unavailable.</div></div>'; return;
             }
             
             articles.slice(0, 3).forEach(article => {
                 const date = new Date(article.publishedAt).toLocaleDateString(undefined, {month:'short', day:'numeric'});
-                const img = article.urlToImage ? `<img src="${article.urlToImage}" class="card-img-top news-img-modern" alt="News Image" onerror="this.src='https://via.placeholder.com/400x200?text=No+Image'">` : `<div class="bg-secondary-subtle d-flex align-items-center justify-content-center news-img-modern"><i class="fa-regular fa-image fa-2x text-secondary"></i></div>`;
+                const img = article.urlToImage ? `<img src="${article.urlToImage}" class="card-img-top news-img-modern" alt="News Image" onerror="this.outerHTML='<div class=&quot;bg-secondary-subtle d-flex align-items-center justify-content-center news-img-modern&quot;><i class=&quot;fa-regular fa-image fa-2x text-secondary&quot;></i></div>'">` : `<div class="bg-secondary-subtle d-flex align-items-center justify-content-center news-img-modern"><i class="fa-regular fa-image fa-2x text-secondary"></i></div>`;
                 
                 container.innerHTML += `
                     <div class="col-md-6 col-lg-4">
@@ -270,7 +345,7 @@
             if(err.not_configured) {
                 container.innerHTML = `<div class="col-12"><div class="alert bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-4 shadow-sm p-4 d-flex align-items-center"><i class="fa-solid fa-triangle-exclamation fa-2x me-3"></i><div><h6 class="fw-bold mb-1">News Service Not Configured</h6><p class="mb-0 small">Please set <code>NEWS_API_KEY</code> in your environment.</p></div></div></div>`;
             } else {
-                container.innerHTML = `<div class="col-12"><div class="alert bg-danger-subtle text-danger border border-danger-subtle rounded-4 shadow-sm">${err.error || 'Failed to load news.'}</div></div>`;
+                container.innerHTML = `<div class="col-12"><div class="card bg-body text-center py-5 border-0 rounded-4 shadow-sm text-muted"><i class="fa-solid fa-newspaper fa-2x mb-3 text-secondary opacity-50"></i><br>Live news is temporarily unavailable.</div></div>`;
             }
         });
     }
