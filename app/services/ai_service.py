@@ -106,10 +106,10 @@ def fetch_agent_insight(query: str, history: list = None) -> str:
                 if is_auth:
                     raise Exception("AI Analysis Unavailable: Invalid API Key. Please contact the administrator to verify the configuration.")
                 
-                raise Exception("AI Provider Error: An unexpected provider error occurred.")
+                raise Exception(f"AI Provider Error: {str(e)} (Details: {e.__class__.__name__})")
                 
     except Exception as e:
         # If it's already one of our custom exceptions, re-raise it exactly as is
         if "AI Analysis Unavailable" in str(e) or "AI Provider Error" in str(e):
             raise
-        raise Exception("AI Provider Error: An unexpected provider error occurred.")
+        raise Exception(f"AI Provider Error: {str(e)} (Details: {e.__class__.__name__})")
