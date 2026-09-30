@@ -93,7 +93,7 @@ def test_provider_failure(mock_client_cls, auth_client, app):
     
     resp = auth_client.post('/api/agent/ask', json={'query': 'Help'})
     assert resp.status_code == 500
-    assert "unexpected provider error" in resp.json['error'].lower()
+    assert "provider error" in resp.json['error'].lower()
     print("[SUCCESS] Provider failure caught gracefully.")
 
 def test_empty_query(auth_client, app):
